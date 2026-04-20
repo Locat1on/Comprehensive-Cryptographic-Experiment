@@ -1,65 +1,137 @@
-# 加解密综合服务平台 - PowerShell 构建脚本
-# 用法: .\build.ps1
-
 $ErrorActionPreference = "Stop"
 
-# 检测编译器路径（优先使用环境变量，否则使用默认路径）
-$GXX = if ($env:GXX) { $env:GXX } elseif (Get-Command g++ -ErrorAction SilentlyContinue) { "g++" }
-$AR = if ($env:AR) { $env:AR } elseif (Get-Command ar -ErrorAction SilentlyContinue) { "ar" }
+function Resolve-Tool([string]$envName, [string]$defaultCommand) {
+    $fromEnv = [Environment]::GetEnvironmentVariable($envName)
+    if ($fromEnv) {
+        return $fromEnv
+    }
 
-# 检测 MSYS2 路径
-$MSYS2_ROOT = if ($env:MSYS2_ROOT) { $env:MSYS2_ROOT } elseif (Test-Path "F:\msys2\mingw64") { "F:\msys2\mingw64" } else { "" }
+    $cmd = Get-Command $defaultCommand -ErrorAction SilentlyContinue
+    if ($cmd) {
+        return $cmd.Source
+    }
 
-$INC = @("-Icrypto\include", "-Ilib")
-if ($MSYS2_ROOT) { $INC += "-I$MSYS2_ROOT\include" }
-
-$FLAGS = @("-std=c++17", "-O2", "-DASIO_STANDALONE")
-
-# 验证编译器是否存在
-if (-not (Test-Path $GXX -ErrorAction SilentlyContinue) -and -not (Get-Command $GXX -ErrorAction SilentlyContinue)) {
-    Write-Host "错误: 找不到 g++ 编译器" -ForegroundColor Red
-    Write-Host "请设置环境变量 GXX 指向 g++.exe 的路径，或将 g++ 添加到 PATH" -ForegroundColor Yellow
-    Write-Host "例如: `$env:GXX = 'C:\msys64\mingw64\bin\g++.exe'" -ForegroundColor Yellow
-    exit 1
+    return $null
 }
 
-Write-Host "[1/3] 编译算法库..." -ForegroundColor Cyan
+function Resolve-IncludeRoot([string]$envName, [string[]]$candidates, [string]$header) {
+    $roots = @()
 
-$sourceFiles = @(
-    @{src="crypto\src\AffineCipher.cpp"; obj="crypto\AffineCipher.o"},
-    @{src="crypto\src\BigInt128.cpp"; obj="crypto\BigInt128.o"},
-    @{src="crypto\src\StreamCipher.cpp"; obj="crypto\StreamCipher.o"},
-    @{src="crypto\src\DES.cpp"; obj="crypto\DES.o"},
-    @{src="crypto\src\RSA.cpp"; obj="crypto\RSA.o"},
-    @{src="crypto\src\DHProtocol.cpp"; obj="crypto\DHProtocol.o"},
-    @{src="crypto\src\Hash.cpp"; obj="crypto\Hash.o"},
-    @{src="crypto\src\DigitalSignature.cpp"; obj="crypto\DigitalSignature.o"},
-    @{src="crypto\src\SecureFileTransfer.cpp"; obj="crypto\SecureFileTransfer.o"}
-)
+    $fromEnv = [Environment]::GetEnvironmentVariable($envName)
+    if ($fromEnv) {
+        $roots += $fromEnv
+    }
 
-foreach ($file in $sourceFiles) {
-    Write-Host "  编译 $($file.src)..." -ForegroundColor Gray
-    & $GXX $FLAGS $INC -c $file.src -o $file.obj
+    $roots += $candidates
+
+    foreach ($root in $roots) {
+        if (-not $root) {
+            continue
+        }
+
+        if (-not (Test-Path $root -ErrorAction SilentlyContinue)) {
+            continue
+        }
+
+        $headerPath = Join-Path $root $header
+        if (Test-Path $headerPath) {
+            return $root
+        }
+    }
+
+    return $null
+}
+
+function Run-Step([string]$tool, [string[]]$arguments, [string]$failureMessage) {
+    & $tool @arguments
     if ($LASTEXITCODE -ne 0) {
-        Write-Host "编译失败: $($file.src)" -ForegroundColor Red
-        exit 1
+        Write-Host $failureMessage -ForegroundColor Red
+        exit $LASTEXITCODE
     }
 }
 
-Write-Host "[2/3] 打包静态库 libcrypto.a..." -ForegroundColor Cyan
-$objFiles = $sourceFiles | ForEach-Object { $_.obj }
-& $AR rcs lib\libcrypto.a $objFiles
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "打包静态库失败" -ForegroundColor Red
+$gxx = Resolve-Tool "GXX" "g++"
+$ar = Resolve-Tool "AR" "ar"
+$asioInclude = Resolve-IncludeRoot "ASIO_ROOT" @(
+    "C:\msys64\mingw64\include",
+    "F:\msys2\mingw64\include"
+) "asio.hpp"
+
+if (-not $gxx) {
+    Write-Host "Error: g++ was not found." -ForegroundColor Red
+    Write-Host 'Set $env:GXX to g++.exe or add g++ to PATH.' -ForegroundColor Yellow
     exit 1
 }
 
-Write-Host "[3/3] 编译服务器并链接..." -ForegroundColor Cyan
-& $GXX $FLAGS $INC src\main.cpp -Llib -lcrypto -o server.exe -lws2_32 -lmswsock
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "编译服务器失败" -ForegroundColor Red
+if (-not $ar) {
+    Write-Host "Error: ar was not found." -ForegroundColor Red
+    Write-Host 'Set $env:AR to ar.exe or add ar to PATH.' -ForegroundColor Yellow
     exit 1
 }
+
+$toolDirs = @(@(
+    [System.IO.Path]::GetDirectoryName($gxx),
+    [System.IO.Path]::GetDirectoryName($ar)
+) | Where-Object { $_ } | Select-Object -Unique)
+
+for ($i = $toolDirs.Count - 1; $i -ge 0; $i--) {
+    $dir = $toolDirs[$i]
+    $pathEntries = @($env:PATH -split ';') | Where-Object { $_ -and $_ -ne $dir }
+    $env:PATH = ($dir + ';' + ($pathEntries -join ';')).TrimEnd(';')
+}
+
+$includeArgs = @(
+    "-Icrypto\include",
+    "-Ilib"
+)
+
+if ($asioInclude) {
+    $includeArgs += "-I$asioInclude"
+} else {
+    Write-Host "Error: asio.hpp was not found." -ForegroundColor Red
+    Write-Host 'Install standalone Asio, then set $env:ASIO_ROOT to its include directory if needed.' -ForegroundColor Yellow
+    Write-Host 'Example: $env:ASIO_ROOT = "C:\msys64\mingw64\include"' -ForegroundColor Yellow
+    exit 1
+}
+
+$compilerFlags = @(
+    "-std=c++17",
+    "-O2",
+    "-DASIO_STANDALONE"
+)
+
+$sourceFiles = @(
+    @{ src = "crypto\src\AffineCipher.cpp";         obj = "crypto\AffineCipher.o" },
+    @{ src = "crypto\src\BigInt128.cpp";            obj = "crypto\BigInt128.o" },
+    @{ src = "crypto\src\StreamCipher.cpp";         obj = "crypto\StreamCipher.o" },
+    @{ src = "crypto\src\DES.cpp";                  obj = "crypto\DES.o" },
+    @{ src = "crypto\src\RSA.cpp";                  obj = "crypto\RSA.o" },
+    @{ src = "crypto\src\DHProtocol.cpp";           obj = "crypto\DHProtocol.o" },
+    @{ src = "crypto\src\Hash.cpp";                 obj = "crypto\Hash.o" },
+    @{ src = "crypto\src\DigitalSignature.cpp";     obj = "crypto\DigitalSignature.o" },
+    @{ src = "crypto\src\SecureFileTransfer.cpp";   obj = "crypto\SecureFileTransfer.o" }
+)
+
+Write-Host "[1/3] Compiling crypto sources..." -ForegroundColor Cyan
+foreach ($file in $sourceFiles) {
+    Write-Host "  $($file.src)" -ForegroundColor DarkGray
+    Run-Step $gxx ($compilerFlags + $includeArgs + @("-c", $file.src, "-o", $file.obj)) "Failed to compile $($file.src)."
+}
+
+Write-Host "[2/3] Creating static library..." -ForegroundColor Cyan
+$objectFiles = $sourceFiles | ForEach-Object { $_.obj }
+Run-Step $ar (@("rcs", "lib\libcrypto.a") + $objectFiles) "Failed to create lib\libcrypto.a."
+
+Write-Host "[3/3] Linking server.exe..." -ForegroundColor Cyan
+Run-Step $gxx ($compilerFlags + $includeArgs + @(
+    "src\main.cpp",
+    "-Llib",
+    "-lcrypto",
+    "-o",
+    "server.exe",
+    "-lws2_32",
+    "-lmswsock"
+)) "Failed to link server.exe."
 
 Write-Host ""
-Write-Host "构建成功！运行: .\server.exe" -ForegroundColor Green
+Write-Host "Build succeeded. Run .\server.exe" -ForegroundColor Green
