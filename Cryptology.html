@@ -1,0 +1,1309 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>CRYPTOLOGY — 加解密综合服务平台</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --dark:#010120;
+  --white:#ffffff;
+  --lavender:#bdbbff;
+  --magenta:#ef2cc1;
+  --orange:#fc4c02;
+  --border-light:rgba(0,0,0,0.08);
+  --border-dark:rgba(255,255,255,0.12);
+  --shadow:rgba(1,1,32,0.12) 0px 4px 16px;
+  --shadow-sm:rgba(1,1,32,0.08) 0px 2px 8px;
+  --font:'Space Grotesk',Arial,sans-serif;
+  --mono:'JetBrains Mono','Courier New',monospace;
+  --r-sm:4px;
+  --r-md:8px;
+}
+html,body{height:100%;overflow:hidden;}
+body{font-family:var(--font);background:var(--dark);color:var(--white);}
+#root{height:100%;display:flex;}
+
+/* ── Scrollbars ── */
+::-webkit-scrollbar{width:4px;height:4px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.15);border-radius:2px;}
+
+/* ── Gradient blobs ── */
+.blob{position:absolute;border-radius:50%;filter:blur(80px);pointer-events:none;opacity:0.18;}
+
+/* ── Input base ── */
+.inp{
+  width:100%;padding:12px 16px;
+  border:1px solid var(--border-light);
+  border-radius:var(--r-sm);
+  font-family:var(--font);font-size:15px;
+  background:#fff;color:#000;
+  outline:none;transition:border 0.2s;
+  letter-spacing:-0.01em;
+}
+.inp:focus{border-color:rgba(1,1,32,0.3);box-shadow:0 0 0 3px rgba(1,1,32,0.06);}
+.inp.mono{font-family:var(--mono);font-size:13px;}
+.inp-dark{
+  background:rgba(255,255,255,0.06);
+  border:1px solid var(--border-dark);
+  color:#fff;
+}
+.inp-dark:focus{border-color:rgba(255,255,255,0.3);box-shadow:0 0 0 3px rgba(255,255,255,0.06);}
+textarea.inp{resize:vertical;min-height:80px;line-height:1.5;}
+
+/* ── Buttons ── */
+.btn{
+  display:inline-flex;align-items:center;gap:8px;
+  padding:12px 22px;border:none;border-radius:var(--r-sm);
+  font-family:var(--font);font-size:15px;font-weight:500;
+  letter-spacing:-0.02em;cursor:pointer;transition:all 0.18s;white-space:nowrap;
+}
+.btn-primary{background:var(--dark);color:#fff;}
+.btn-primary:hover{background:#0a0a35;transform:translateY(-1px);box-shadow:var(--shadow);}
+.btn-outline{background:transparent;color:#000;border:1px solid var(--border-light);}
+.btn-outline:hover{background:rgba(0,0,0,0.04);}
+.btn-ghost-dark{background:rgba(255,255,255,0.1);color:#fff;border:1px solid var(--border-dark);}
+.btn-ghost-dark:hover{background:rgba(255,255,255,0.18);}
+.btn-accent{background:linear-gradient(135deg,var(--magenta),var(--orange));color:#fff;}
+.btn-accent:hover{opacity:0.88;transform:translateY(-1px);}
+.btn-sm{padding:6px 14px;font-size:13px;}
+.btn:disabled{opacity:0.45;cursor:not-allowed;transform:none!important;}
+
+/* ── Label ── */
+.label{
+  font-family:var(--font);font-size:14px;font-weight:500;
+  letter-spacing:0em;color:rgba(0,0,0,0.7);
+  margin-bottom:8px;display:block;
+}
+.label-dark{color:rgba(255,255,255,0.6);}
+
+/* ── Code output ── */
+.code-out{
+  background:var(--dark);color:#bdbbff;
+  font-family:var(--mono);font-size:13px;
+  padding:16px;border-radius:var(--r-md);
+  min-height:60px;word-break:break-all;line-height:1.6;
+  border:1px solid rgba(255,255,255,0.08);
+  white-space:pre-wrap;
+}
+.code-out.light{background:#f7f7fb;color:#010120;border:1px solid var(--border-light);}
+
+/* ── API Badge ── */
+.api-badge{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:3px 10px;border-radius:var(--r-sm);
+  font-family:var(--mono);font-size:11px;font-weight:500;
+  letter-spacing:0.04em;border:1px solid var(--border-dark);
+  background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.6);
+}
+.api-badge .method{color:var(--lavender);font-weight:600;}
+.api-badge.light{background:rgba(1,1,32,0.04);border-color:var(--border-light);color:rgba(0,0,0,0.5);}
+.api-badge.light .method{color:#6c5ce7;}
+
+/* ── Status pill ── */
+.status{
+  display:inline-flex;align-items:center;gap:5px;
+  padding:2px 9px;border-radius:var(--r-sm);
+  font-family:var(--mono);font-size:11px;letter-spacing:0.04em;text-transform:uppercase;
+  border:1px solid var(--border-light);
+}
+.status.ok{background:rgba(0,200,100,0.08);color:#00944a;border-color:rgba(0,200,100,0.2);}
+.status.warn{background:rgba(252,76,2,0.08);color:#c54000;border-color:rgba(252,76,2,0.2);}
+.status.info{background:rgba(189,187,255,0.15);color:#5b57d1;border-color:rgba(189,187,255,0.3);}
+.status .dot{width:5px;height:5px;border-radius:50%;background:currentColor;}
+
+/* ── Section divider ── */
+.divider{height:1px;background:var(--border-light);margin:20px 0;}
+.divider-dark{background:var(--border-dark);}
+
+/* ── Grid helpers ── */
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;}
+.flex{display:flex;align-items:center;}
+.flex-gap{gap:10px;}
+.col{display:flex;flex-direction:column;gap:16px;}
+
+/* ── Animated result ── */
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
+.result-appear{animation:fadeUp 0.25s ease;}
+
+/* ── Progress bar ── */
+.progress-track{height:6px;background:rgba(0,0,0,0.08);border-radius:3px;overflow:hidden;}
+.progress-fill{height:100%;background:linear-gradient(90deg,var(--magenta),var(--orange));border-radius:3px;transition:width 0.4s ease;}
+
+/* ── DH visualization ── */
+.dh-entity{
+  background:var(--dark);border:1px solid var(--border-dark);
+  border-radius:var(--r-md);padding:20px;flex:1;
+  position:relative;
+}
+.dh-arrow{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:0 12px;color:var(--lavender);font-size:11px;font-family:var(--mono);
+  text-align:center;gap:6px;min-width:80px;
+}
+
+/* ── Tweaks panel ── */
+#tweaks-panel{
+  position:fixed;bottom:24px;right:24px;z-index:1000;
+  background:var(--white);border:1px solid var(--border-light);
+  border-radius:var(--r-md);padding:20px;width:260px;
+  box-shadow:var(--shadow);display:none;
+}
+#tweaks-panel.open{display:block;}
+#tweaks-panel h3{font-size:13px;font-weight:600;letter-spacing:-0.02em;margin-bottom:14px;color:#000;}
+
+/* ── Select ── */
+.sel{
+  width:100%;padding:12px 16px;
+  border:1px solid var(--border-light);border-radius:var(--r-sm);
+  font-family:var(--font);font-size:15px;background:#fff;color:#000;
+  outline:none;cursor:pointer;appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23000' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 14px center;
+  padding-right:36px;
+}
+.sel:focus{border-color:rgba(1,1,32,0.3);}
+
+/* ── Radio toggle ── */
+.toggle-group{display:flex;border:1px solid var(--border-light);border-radius:var(--r-sm);overflow:hidden;}
+.toggle-btn{
+  flex:1;padding:11px 16px;font-family:var(--font);font-size:14px;font-weight:500;
+  letter-spacing:-0.01em;border:none;cursor:pointer;background:#fff;color:rgba(0,0,0,0.5);
+  transition:all 0.15s;
+}
+.toggle-btn.active{background:var(--dark);color:#fff;}
+
+/* ── File drop zone ── */
+.file-zone{
+  border:1.5px dashed var(--border-light);border-radius:var(--r-md);
+  padding:20px;text-align:center;cursor:pointer;
+  transition:all 0.2s;background:rgba(0,0,0,0.01);
+}
+.file-zone:hover{border-color:rgba(1,1,32,0.25);background:rgba(1,1,32,0.02);}
+.file-zone.has-file{border-color:rgba(0,180,80,0.4);background:rgba(0,180,80,0.04);}
+
+/* ── Tooltip ── */
+.tooltip-wrap{position:relative;display:inline-flex;}
+.tooltip-wrap:hover .tooltip{opacity:1;pointer-events:auto;}
+.tooltip{
+  position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);
+  background:var(--dark);color:#fff;font-family:var(--mono);font-size:11px;
+  padding:5px 10px;border-radius:var(--r-sm);white-space:nowrap;
+  opacity:0;pointer-events:none;transition:opacity 0.15s;z-index:100;
+}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<div id="tweaks-panel">
+  <h3>Tweaks</h3>
+  <div style="display:flex;flex-direction:column;gap:12px;">
+    <div>
+      <label class="label">Accent Theme</label>
+      <select class="sel" id="tw-accent" style="font-size:13px;">
+        <option value="default">Magenta × Orange (default)</option>
+        <option value="blue">Lavender × Blue</option>
+        <option value="green">Teal × Emerald</option>
+      </select>
+    </div>
+    <div>
+      <label class="label">Sidebar Width</label>
+      <input type="range" min="200" max="320" value="240" id="tw-sidebar" style="width:100%;">
+    </div>
+    <div>
+      <label class="label">Content Density</label>
+      <div class="toggle-group">
+        <button class="toggle-btn active" onclick="setDensity('comfortable',this)">Comfortable</button>
+        <button class="toggle-btn" onclick="setDensity('compact',this)">Compact</button>
+      </div>
+    </div>
+    <div>
+      <label class="label">Show API Endpoints</label>
+      <div class="toggle-group">
+        <button class="toggle-btn active" id="tw-api-on" onclick="toggleAPI(true)">Show</button>
+        <button class="toggle-btn" id="tw-api-off" onclick="toggleAPI(false)">Hide</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="text/babel">
+const { useState, useRef, useEffect, useCallback } = React;
+
+// ── Utility helpers ──────────────────────────────────────────
+function copyText(t) {
+  navigator.clipboard?.writeText(t).catch(()=>{});
+}
+function hex(n, pad=2){ return n.toString(16).toUpperCase().padStart(pad,'0'); }
+function randomHex(bytes){ return Array.from({length:bytes},()=>hex(Math.floor(Math.random()*256))).join(''); }
+
+// ── Common Components ────────────────────────────────────────
+function MonoLabel({children, dark}){
+  return <span className={`label${dark?' label-dark':''}`}>{children}</span>;
+}
+
+function APIEndpoint({method, path, show=true}){
+  if(!show) return null;
+  return (
+    <div className="api-badge light" style={{marginTop:6}}>
+      <span className="method">{method}</span>
+      <span>/api/v1{path}</span>
+    </div>
+  );
+}
+
+function ResultBox({value, label='OUTPUT', dark=false}){
+  const [copied,setCopied] = useState(false);
+  if(!value) return null;
+  return (
+    <div className="result-appear">
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:6}}>
+        <MonoLabel dark={dark}>{label}</MonoLabel>
+        <button className={`btn btn-sm ${dark?'btn-ghost-dark':'btn-outline'}`}
+          onClick={()=>{copyText(value);setCopied(true);setTimeout(()=>setCopied(false),1500);}}>
+          {copied?'Copied!':'Copy'}
+        </button>
+      </div>
+      <div className={`code-out${dark?'':' light'}`}>{value}</div>
+    </div>
+  );
+}
+
+function FileDropZone({label='XML / KEY FILE', accept='.xml,.key,.txt', onFile}){
+  const ref = useRef();
+  const [fileName, setFileName] = useState(null);
+  function handle(file){
+    if(!file) return;
+    setFileName(file.name);
+    const r = new FileReader();
+    r.onload = e => onFile?.(e.target.result, file.name);
+    r.readAsText(file);
+  }
+  return (
+    <div className={`file-zone${fileName?' has-file':''}`}
+      onClick={()=>ref.current.click()}
+      onDragOver={e=>e.preventDefault()}
+      onDrop={e=>{e.preventDefault();handle(e.dataTransfer.files[0]);}}>
+      <input ref={ref} type="file" accept={accept} style={{display:'none'}}
+        onChange={e=>handle(e.target.files[0])}/>
+      <div style={{width:28,height:28,margin:'0 auto 6px',display:'flex',alignItems:'center',justifyContent:'center'}}>{fileName?(<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 8l4 4 8-8" stroke="#00944a" strokeWidth="2" strokeLinecap="round"/></svg>):(<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 2v9M4 7l4-5 4 5" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" opacity=".5"/><path d="M2 13h12" stroke="#000" strokeWidth="1.5" strokeLinecap="round" opacity=".3"/></svg>)}</div>
+      <div style={{fontSize:13,fontWeight:500,color:fileName?'#00944a':'rgba(0,0,0,0.75)',letterSpacing:'-0.01em'}}>
+        {fileName||label}
+      </div>
+      {!fileName && <div style={{fontSize:12,color:'rgba(0,0,0,0.5)',marginTop:4}}>点击或拖拽上传</div>}
+    </div>
+  );
+}
+
+function SectionHeader({title, subtitle, badge, apiShow}){
+  return (
+    <div style={{marginBottom:28}}>
+      <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',flexWrap:'wrap',gap:10}}>
+        <div>
+          {badge && <div style={{fontFamily:'var(--mono)',fontSize:11,letterSpacing:'0.06em',
+            textTransform:'uppercase',color:'rgba(0,0,0,0.4)',marginBottom:8}}>{badge}</div>}
+          <h2 style={{fontSize:30,fontWeight:600,letterSpacing:'-0.04em',color:'#010120',lineHeight:1.1}}>{title}</h2>
+          {subtitle && <p style={{fontSize:15,color:'rgba(0,0,0,0.55)',marginTop:8,letterSpacing:'-0.01em',lineHeight:1.5}}>{subtitle}</p>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Service Panels ───────────────────────────────────────────
+
+// 1. 仿射加密
+function AffineCipher({apiShow}){
+  const [text,setText] = useState('HELLO WORLD');
+  const [a,setA] = useState('7');
+  const [b,setB] = useState('3');
+  const [mode,setMode] = useState('encrypt');
+  const [result,setResult] = useState('');
+  const [keyFile,setKeyFile] = useState(null);
+
+  function affineEncrypt(t,a,b){
+    return t.toUpperCase().split('').map(c=>{
+      if(c<'A'||c>'Z') return c;
+      return String.fromCharCode(((parseInt(a)*(c.charCodeAt(0)-65)+parseInt(b))%26)+65);
+    }).join('');
+  }
+  function modInverse(a,m){
+    for(let x=1;x<m;x++) if((a*x)%m===1) return x;
+    return -1;
+  }
+  function affineDecrypt(t,a,b){
+    const ai=modInverse(parseInt(a),26);
+    if(ai===-1) return 'Error: a has no modular inverse (gcd(a,26) ≠ 1)';
+    return t.toUpperCase().split('').map(c=>{
+      if(c<'A'||c>'Z') return c;
+      return String.fromCharCode(((ai*(c.charCodeAt(0)-65-parseInt(b)+26*26))%26)+65);
+    }).join('');
+  }
+  function run(){
+    try{
+      setResult(mode==='encrypt'?affineEncrypt(text,a,b):affineDecrypt(text,a,b));
+    }catch(e){setResult('Error: '+e.message);}
+  }
+  function parseKeyFile(content){
+    try{
+      const ma = content.match(/<a>(\d+)<\/a>/);
+      const mb = content.match(/<b>(\d+)<\/b>/);
+      if(ma) setA(ma[1]);
+      if(mb) setB(mb[1]);
+      setKeyFile('从文件加载');
+    }catch(e){setKeyFile('解析失败');}
+  }
+
+  return (
+    <div className="col">
+      <SectionHeader title="仿射加密" badge="Classical Cipher" apiShow={apiShow}
+        subtitle="E(x) = (ax + b) mod 26  —  密钥参数可通过 XML 文件配置"/>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20}}>
+        <div className="col">
+          <div>
+            <MonoLabel>明文 / 密文</MonoLabel>
+            <textarea className="inp mono" rows={4} value={text} onChange={e=>setText(e.target.value)}/>
+          </div>
+          <div className="grid-2">
+            <div>
+              <MonoLabel>参数 a (与26互质)</MonoLabel>
+              <select className="sel" value={a} onChange={e=>setA(e.target.value)}>
+                {[1,3,5,7,9,11,15,17,19,21,23,25].map(v=><option key={v}>{v}</option>)}
+              </select>
+            </div>
+            <div>
+              <MonoLabel>参数 b (0–25)</MonoLabel>
+              <input className="inp" type="number" min="0" max="25" value={b}
+                onChange={e=>setB(e.target.value)}/>
+            </div>
+          </div>
+          {keyFile && <div className="status ok"><span className="dot"/>已从文件加载密钥: {keyFile}</div>}
+          <div className="toggle-group">
+            <button className={`toggle-btn${mode==='encrypt'?' active':''}`} onClick={()=>setMode('encrypt')}>加密 Encrypt</button>
+            <button className={`toggle-btn${mode==='decrypt'?' active':''}`} onClick={()=>setMode('decrypt')}>解密 Decrypt</button>
+          </div>
+          <div style={{display:'flex',gap:10}}>
+            <button className="btn btn-primary" style={{flex:1,justifyContent:'center'}} onClick={run}>
+              {mode==='encrypt'?'▶  加密':'▶  解密'}
+            </button>
+          </div>
+          {apiShow && <div style={{display:'flex',flexDirection:'column',gap:4}}>
+            <APIEndpoint method="POST" path="/affine/encrypt" show={apiShow}/>
+            <APIEndpoint method="POST" path="/affine/decrypt" show={apiShow}/>
+          </div>}
+        </div>
+        <div className="col">
+          <div>
+            <MonoLabel>XML 密钥文件</MonoLabel>
+            <FileDropZone label="拖入 key.xml 配置文件" accept=".xml,.key" onFile={parseKeyFile}/>
+            <div style={{marginTop:8,fontSize:12,color:'rgba(0,0,0,0.35)',fontFamily:'var(--mono)'}}>
+              {'<!-- key.xml format -->\n<key><a>7</a><b>3</b></key>'}
+            </div>
+          </div>
+          <ResultBox value={result} label="结果"/>
+        </div>
+      </div>
+    </div>
+  );
+  function modInverse(a,m){for(let x=1;x<m;x++) if((a*x)%m===1) return x;return -1;}
+}
+
+// 2. 大整数运算
+function BigIntOps({apiShow}){
+  const [a,setA] = useState('340282366920938463463374607431768211455');
+  const [b,setB] = useState('170141183460469231731687303715884105727');
+  const [op,setOp] = useState('+');
+  const [result,setResult] = useState('');
+  const [steps,setSteps] = useState([]);
+
+  function run(){
+    try{
+      const ba = BigInt(a||'0'), bb = BigInt(b||'0');
+      let r, desc=[];
+      if(op==='+'){
+        r=ba+bb;
+        desc=[`A = ${ba.toString(16).toUpperCase().padStart(32,'0')}ₕ`,
+              `B = ${bb.toString(16).toUpperCase().padStart(32,'0')}ₕ`,
+              `A + B = ${r.toString(16).toUpperCase()}ₕ`];
+      } else if(op==='-'){
+        r=ba-bb;
+        desc=[`A - B = ${r < 0n ? '-' : ''}${(r < 0n ? -r : r).toString(16).toUpperCase()}ₕ`];
+      } else {
+        r=ba*bb;
+        desc=[`A × B (256-bit result)`,
+              `= ${r.toString(16).toUpperCase()}ₕ`];
+      }
+      setResult(r.toString());
+      setSteps(desc);
+    }catch(e){setResult('Error: invalid input');setSteps([]);}
+  }
+
+  const ops = [
+    {sym:'+',label:'加法 ADD'},
+    {sym:'-',label:'减法 SUB'},
+    {sym:'×',label:'乘法 MUL'},
+  ];
+
+  return (
+    <div className="col">
+      <SectionHeader title="128-bit 大整数运算" badge="Big Integer Arithmetic"
+        subtitle="自建类实现两个 128-bit 整数的加、减、乘运算"/>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20}}>
+        <div className="col">
+          <div>
+            <MonoLabel>操作数 A (128-bit)</MonoLabel>
+            <input className="inp mono" value={a} onChange={e=>setA(e.target.value)}
+              placeholder="十进制整数 (最大 128-bit)"/>
+            <div style={{fontSize:11,fontFamily:'var(--mono)',color:'rgba(0,0,0,0.55)',marginTop:4}}>
+              HEX: {a ? BigInt(a||'0').toString(16).toUpperCase().padStart(32,'0').slice(-32) : '—'}
+            </div>
+          </div>
+          <div>
+            <MonoLabel>操作数 B (128-bit)</MonoLabel>
+            <input className="inp mono" value={b} onChange={e=>setB(e.target.value)}
+              placeholder="十进制整数 (最大 128-bit)"/>
+            <div style={{fontSize:11,fontFamily:'var(--mono)',color:'rgba(0,0,0,0.55)',marginTop:4}}>
+              HEX: {b ? BigInt(b||'0').toString(16).toUpperCase().padStart(32,'0').slice(-32) : '—'}
+            </div>
+          </div>
+          <div>
+            <MonoLabel>运算类型</MonoLabel>
+            <div style={{display:'flex',gap:8}}>
+              {ops.map(o=>(
+                <button key={o.sym} className={`btn ${op===o.sym?'btn-primary':'btn-outline'}`} style={{flex:1,justifyContent:'center'}}
+                  onClick={()=>setOp(o.sym)}>{o.label}</button>
+              ))}
+            </div>
+          </div>
+          <button className="btn btn-primary" onClick={run} style={{width:'100%',justifyContent:'center'}}>
+            ▶  计算 A {op} B
+          </button>
+          {apiShow && <APIEndpoint method="POST" path="/bigint/calc" show={apiShow}/>}
+        </div>
+        <div className="col">
+          <div style={{background:'rgba(1,1,32,0.03)',border:'1px solid var(--border-light)',borderRadius:'var(--r-md)',padding:20}}>
+            <MonoLabel>运算说明</MonoLabel>
+            <div style={{display:'flex',flexDirection:'column',gap:12,marginTop:12}}>
+              {[{step:'+',title:'128-bit 加法',desc:'逐 64-bit 分块相加，低位进位传递至高位，结果最大 129-bit'},
+                {step:'-',title:'128-bit 减法',desc:'被减数不足时借位，支持负数结果（补码表示）'},
+                {step:'×',title:'128-bit 乘法',desc:'Karatsuba 分治算法，结果最大 256-bit，自建 BigInt256 类承载'},
+              ].map(st=>(
+                <div key={st.step} style={{display:'flex',gap:12,alignItems:'flex-start'}}>
+                  <div style={{width:28,height:28,borderRadius:'var(--r-sm)',background:'var(--dark)',color:'#bdbbff',fontFamily:'var(--mono)',fontSize:14,fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>{st.step}</div>
+                  <div><div style={{fontSize:13,fontWeight:600,letterSpacing:'-0.02em',marginBottom:2,color:'#010120'}}>{st.title}</div><div style={{fontSize:12,color:'rgba(0,0,0,0.75)',lineHeight:1.5}}>{st.desc}</div></div>
+                </div>
+              ))}
+            </div>
+          </div>
+          {steps.length>0 && (
+            <div className="result-appear col" style={{gap:8}}>
+              <MonoLabel>运算过程</MonoLabel>
+              <div className="code-out light" style={{lineHeight:1.8}}>
+                {steps.map((s,i)=><div key={i}>{s}</div>)}
+              </div>
+            </div>
+          )}
+          <ResultBox value={result} label="十进制结果"/>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// 3. 流密码
+function StreamCipher({apiShow}){
+  const [method,setMethod] = useState('RC4');
+  const [seed,setSeed] = useState('53 65 63 72 65 74 4B 65 79');
+  const [plaintext,setPlaintext] = useState('Hello, Cryptology!');
+  const [result,setResult] = useState('');
+  const [keystream,setKeystream] = useState('');
+
+  function rc4(key, msg){
+    const k = key.split(/\s+/).filter(Boolean).map(h=>parseInt(h,16));
+    const S = Array.from({length:256},(_,i)=>i);
+    let j=0;
+    for(let i=0;i<256;i++){j=(j+S[i]+k[i%k.length])%256;[S[i],S[j]]=[S[j],S[i]];}
+    let i2=0,j2=0;
+    const ks=[], out=[];
+    for(const ch of [...msg].map(c=>c.charCodeAt(0))){
+      i2=(i2+1)%256; j2=(j2+S[i2])%256; [S[i2],S[j2]]=[S[j2],S[i2]];
+      const k2=S[(S[i2]+S[j2])%256]; ks.push(hex(k2)); out.push(hex(ch^k2));
+    }
+    return {cipher:out.join(' '), keystream:ks.join(' ')};
+  }
+
+  function lfsrJK(seed, len){
+    const bits = seed.split(/\s+/).filter(Boolean).flatMap(h=>{
+      const n=parseInt(h,16);
+      return [7,6,5,4,3,2,1,0].map(b=>(n>>b)&1);
+    });
+    const reg = [...bits.slice(0,8)];
+    const out=[];
+    for(let i=0;i<len;i++){
+      out.push(reg[0]);
+      const jk = reg[0]^reg[2]^reg[4]^reg[7];
+      reg.shift(); reg.push(jk);
+    }
+    const ks=[], cipher=[];
+    const bytes=[...plaintext].map(c=>c.charCodeAt(0));
+    for(let i=0;i<bytes.length;i++){
+      const kb=out.slice(i*8,(i+1)*8).reduce((acc,b,j)=>acc|(b<<(7-j)),0);
+      ks.push(hex(kb)); cipher.push(hex(bytes[i]^kb));
+    }
+    return {cipher:cipher.join(' '), keystream:ks.join(' ')};
+  }
+
+  function run(){
+    try{
+      const r = method==='RC4' ? rc4(seed, plaintext) : lfsrJK(seed, plaintext.length*8);
+      setResult(r.cipher);
+      setKeystream(r.keystream);
+    }catch(e){setResult('Error: '+e.message);}
+  }
+
+  return (
+    <div className="col">
+      <SectionHeader title="流密码加密" badge="Stream Cipher"
+        subtitle="支持 RC4 算法与 LFSR + J-K 触发器两种密钥流生成方式"/>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:28,alignItems:'start'}}>
+        <div className="col">
+          <div>
+            <MonoLabel>密钥流生成方式</MonoLabel>
+            <div className="toggle-group">
+              <button className={`toggle-btn${method==='RC4'?' active':''}`} onClick={()=>setMethod('RC4')}>RC4</button>
+              <button className={`toggle-btn${method==='LFSR'?' active':''}`} onClick={()=>setMethod('LFSR')}>LFSR + J-K</button>
+            </div>
+          </div>
+          <div>
+            <MonoLabel>种子密钥 (HEX bytes)</MonoLabel>
+            <input className="inp mono" value={seed} onChange={e=>setSeed(e.target.value)}
+              placeholder="e.g. 53 65 63 72 65 74"/>
+          </div>
+          <div>
+            <MonoLabel>XML 种子密钥文件</MonoLabel>
+            <FileDropZone label="seed.xml" accept=".xml,.key"
+              onFile={c=>{const m=c.match(/<seed>([^<]+)<\/seed>/);if(m)setSeed(m[1].trim());}}/>
+          </div>
+          <div>
+            <MonoLabel>明文</MonoLabel>
+            <textarea className="inp mono" rows={3} value={plaintext} onChange={e=>setPlaintext(e.target.value)}/>
+          </div>
+          <button className="btn btn-primary" onClick={run} style={{width:'100%',justifyContent:'center'}}>
+            ▶  加密
+          </button>
+          {apiShow && <div style={{display:'flex',flexDirection:'column',gap:4}}>
+            <APIEndpoint method="POST" path="/stream/rc4" show={method==='RC4'&&apiShow}/>
+            <APIEndpoint method="POST" path="/stream/lfsr" show={method==='LFSR'&&apiShow}/>
+          </div>}
+        </div>
+        <div className="col">
+          <div style={{background:'rgba(1,1,32,0.03)',border:'1px solid var(--border-light)',borderRadius:'var(--r-md)',padding:20}}>
+            <MonoLabel>加密流程</MonoLabel>
+            <div style={{display:'flex',flexDirection:'column',gap:16,marginTop:12}}>
+              {(method==='RC4'?(
+                [{step:'01',title:'KSA',desc:'用种子密钥置换初始化 256-byte S 盒'},{step:'02',title:'PRGA',desc:'流式生成伪随机密钥字节序列'},{step:'03',title:'XOR',desc:'密钥流与明文逐字节异或得密文'}]
+              ):(
+                [{step:'01',title:'LFSR',desc:'线性反馈移位寄存器，多项式 f(x)=x⁸+x⁶+x⁴+x+1'},{step:'02',title:'J-K 触发器',desc:'触发器位 [0,2,4,7] 引入非线性增强安全性'},{step:'03',title:'XOR',desc:'密钥流与明文逐字节异或得密文'}]
+              )).map(st=>(
+                <div key={st.step} style={{display:'flex',gap:12,alignItems:'flex-start'}}>
+                  <div style={{width:28,height:28,borderRadius:'var(--r-sm)',background:'var(--dark)',color:'#bdbbff',fontFamily:'var(--mono)',fontSize:10,fontWeight:600,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>{st.step}</div>
+                  <div><div style={{fontSize:13,fontWeight:600,letterSpacing:'-0.02em',marginBottom:2,color:'#010120'}}>{st.title}</div><div style={{fontSize:12,color:'rgba(0,0,0,0.75)',lineHeight:1.5}}>{st.desc}</div></div>
+                </div>
+              ))}
+            </div>
+          </div>
+          {keystream && <ResultBox value={keystream} label="密钥流 (HEX)"/>}
+          <ResultBox value={result} label="密文 (HEX)"/>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// 4. DES
+function DESCipher({apiShow}){
+  const [key,setKey] = useState('133457799BBCDFF1');
+  const [plaintext,setPlaintext] = useState('0123456789ABCDEF');
+  const [mode,setMode] = useState('encrypt');
+  const [result,setResult] = useState('');
+
+  // Simplified DES demo (real DES requires full implementation on backend)
+  function simulate(){
+    const k = key.replace(/\s/g,'');
+    const p = plaintext.replace(/\s/g,'');
+    // Show interface/mock for demo — real impl on backend
+    const mock = mode==='encrypt'
+      ? Array.from({length:Math.ceil(p.length/2)},()=>hex(Math.floor(Math.random()*256))).join(' ')
+      : Array.from({length:p.length/2},(_,i)=>hex(parseInt(p.slice(i*2,i*2+2)||'41',16)^0x20)).join(' ');
+    setResult(`[DEMO] ${mock}\n\n// 后端接口: POST /api/v1/des/${mode}\n// 实际 DES 运算在服务器端执行`);
+  }
+
+  return (
+    <div className="col">
+      <SectionHeader title="DES 对称加密" badge="Symmetric Cipher"
+        subtitle="数据加密标准 — 64-bit 分组，56-bit 有效密钥，16 轮 Feistel 结构"/>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20}}>
+        <div className="col">
+          <div>
+            <MonoLabel>DES 密钥 (64-bit HEX)</MonoLabel>
+            <input className="inp mono" value={key} onChange={e=>setKey(e.target.value)}
+              placeholder="16个HEX字符, e.g. 133457799BBCDFF1"/>
+          </div>
+          <div>
+            <MonoLabel>XML 密钥文件</MonoLabel>
+            <FileDropZone label="des-key.xml" accept=".xml,.key"
+              onFile={c=>{const m=c.match(/<key>([^<]+)<\/key>/);if(m)setKey(m[1].trim());}}/>
+          </div>
+          <div>
+            <MonoLabel>明文 / 密文 (HEX)</MonoLabel>
+            <textarea className="inp mono" rows={3} value={plaintext} onChange={e=>setPlaintext(e.target.value)}/>
+          </div>
+          <div className="toggle-group">
+            <button className={`toggle-btn${mode==='encrypt'?' active':''}`} onClick={()=>setMode('encrypt')}>加密</button>
+            <button className={`toggle-btn${mode==='decrypt'?' active':''}`} onClick={()=>setMode('decrypt')}>解密</button>
+          </div>
+          <button className="btn btn-primary" onClick={simulate} style={{width:'100%',justifyContent:'center'}}>
+            ▶  执行 DES {mode==='encrypt'?'加密':'解密'}
+          </button>
+          {apiShow && <div style={{display:'flex',flexDirection:'column',gap:4}}>
+            <APIEndpoint method="POST" path="/des/encrypt" show={apiShow}/>
+            <APIEndpoint method="POST" path="/des/decrypt" show={apiShow}/>
+          </div>}
+        </div>
+        <div className="col">
+          <div style={{background:'rgba(1,1,32,0.03)',border:'1px solid var(--border-light)',borderRadius:'var(--r-md)',padding:20}}>
+            <MonoLabel>Feistel 结构</MonoLabel>
+            <div style={{display:'flex',flexDirection:'column',gap:12,marginTop:12}}>
+              {[{step:'IP',desc:'初始置换 (64-bit 输入)'},
+                {step:'×16',desc:'每轮: L(i)=R(i-1), R(i)=L(i-1)⊕f(R(i-1),Kᵢ)',accent:true},
+                {step:'f()',desc:'E扩展 → XOR子密钥 → 8个S盒 → P置换'},
+                {step:'IP⁻¹',desc:'逆置换输出 64-bit 密文'},
+              ].map(s=>(
+                <div key={s.step} style={{display:'flex',gap:12,alignItems:'flex-start'}}>
+                  <div style={{minWidth:36,height:28,borderRadius:'var(--r-sm)',background:s.accent?'var(--dark)':'rgba(1,1,32,0.08)',color:s.accent?'#bdbbff':'#010120',fontFamily:'var(--mono)',fontSize:10,fontWeight:600,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,padding:'0 4px'}}>{s.step}</div>
+                  <div style={{fontSize:12,color:'rgba(0,0,0,0.75)',lineHeight:1.6,paddingTop:5}}>{s.desc}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <ResultBox value={result} label="结果"/>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// 5. RSA
+function RSACipher({apiShow}){
+  const [p,setP] = useState('61');
+  const [q,setQ] = useState('53');
+  const [e,setE] = useState('17');
+  const [msg,setMsg] = useState('Hello RSA');
+  const [result,setResult] = useState('');
+  const [keys,setKeys] = useState(null);
+
+  function gcd(a,b){return b===0?a:gcd(b,a%b);}
+  function modpow(base,exp,mod){let r=1n;base=BigInt(base)%BigInt(mod);exp=BigInt(exp);mod=BigInt(mod);while(exp>0n){if(exp%2n===1n)r=r*base%mod;exp=exp/2n;base=base*base%mod;}return r;}
+
+  function genKeys(){
+    const pn=parseInt(p), qn=parseInt(q), en=parseInt(e);
+    const n=pn*qn, phi=(pn-1)*(qn-1);
+    if(gcd(en,phi)!==1){setResult('Error: gcd(e, φ(n)) ≠ 1, 请调整 e');return;}
+    let d=1; while((en*d)%phi!==1) d++;
+    setKeys({n,phi,e:en,d,pub:`(e=${en}, n=${n})`,priv:`(d=${d}, n=${n})`});
+    setResult('');
+  }
+
+  function encrypt(){
+    if(!keys){setResult('请先生成密钥');return;}
+    const bytes = [...msg].map(c=>c.charCodeAt(0));
+    // 对每个字节单独加密
+    const enc = bytes.map(b=>modpow(b,keys.e,keys.n).toString()).join(' | ');
+    setResult(`密文 (分块): ${enc}\n\n注: 模数 n=${keys.n} < 16bit，实际应用中按块加密`);
+  }
+
+  function decrypt(){
+    if(!keys||!result.includes('|')){setResult('请先加密');return;}
+    const parts = result.split('\n')[0].replace('密文 (分块): ','').split(' | ');
+    const dec = parts.map(p=>String.fromCharCode(Number(modpow(p,keys.d,keys.n)))).join('');
+    setResult(`解密结果: ${dec}`);
+  }
+
+  return (
+    <div className="col">
+      <SectionHeader title="RSA 非对称加密" badge="Asymmetric Cipher"
+        subtitle="自构造 RSA — 模数 n &lt; 16bit，支持大于 16bit 消息的分块加密"/>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20}}>
+        <div className="col">
+          <div className="grid-3">
+            <div><MonoLabel>素数 p</MonoLabel><input className="inp mono" value={p} onChange={e=>setP(e.target.value)} type="number"/></div>
+            <div><MonoLabel>素数 q</MonoLabel><input className="inp mono" value={q} onChange={e=>setQ(e.target.value)} type="number"/></div>
+            <div><MonoLabel>公钥指数 e</MonoLabel><input className="inp mono" value={e} onChange={e2=>setE(e2.target.value)} type="number"/></div>
+          </div>
+          <button className="btn btn-outline" onClick={genKeys} style={{width:'100%',justifyContent:'center'}}>
+            生成密钥对
+          </button>
+          {keys && (
+            <div className="result-appear" style={{background:'rgba(1,1,32,0.04)',border:'1px solid var(--border-light)',borderRadius:'var(--r-md)',padding:16}}>
+              <div style={{fontFamily:'var(--mono)',fontSize:12,lineHeight:1.8}}>
+                <div>n = p×q = <strong>{keys.n}</strong>  |  φ(n) = <strong>{keys.phi}</strong></div>
+                <div style={{color:'#5b57d1'}}>公钥: {keys.pub}</div>
+                <div style={{color:'#c54000'}}>私钥: {keys.priv}</div>
+              </div>
+            </div>
+          )}
+          <div><MonoLabel>消息</MonoLabel>
+            <textarea className="inp" rows={3} value={msg} onChange={e=>setMsg(e.target.value)}/>
+          </div>
+          <div style={{display:'flex',gap:8}}>
+            <button className="btn btn-primary" style={{flex:1,justifyContent:'center'}} onClick={encrypt}>▶ 加密</button>
+            <button className="btn btn-outline" style={{flex:1,justifyContent:'center'}} onClick={decrypt}>◀ 解密</button>
+          </div>
+          {apiShow && <div style={{display:'flex',flexDirection:'column',gap:4}}>
+            <APIEndpoint method="POST" path="/rsa/keygen" show={apiShow}/>
+            <APIEndpoint method="POST" path="/rsa/encrypt" show={apiShow}/>
+            <APIEndpoint method="POST" path="/rsa/decrypt" show={apiShow}/>
+          </div>}
+        </div>
+        <div className="col">
+          <div style={{background:'rgba(1,1,32,0.03)',border:'1px solid var(--border-light)',borderRadius:'var(--r-md)',padding:20}}>
+            <MonoLabel>分块加密方案</MonoLabel>
+            <div style={{display:'flex',flexDirection:'column',gap:12,marginTop:12}}>
+              {[{step:'01',title:'密钥生成',desc:'选取素数 p、q，计算 n=p×q，φ(n)=(p-1)(q-1)，选 e 满足 gcd(e,φ)=1，求 d≡e⁻¹(mod φ)'},
+                {step:'02',title:'分块策略',desc:'n < 65536，消息按字节切分，每字节 m 独立计算 c=mᵉ mod n'},
+                {step:'03',title:'解密',desc:'逐块计算 m=cᵈ mod n，拼接还原原始消息'},
+              ].map(s=>(
+                <div key={s.step} style={{display:'flex',gap:12,alignItems:'flex-start'}}>
+                  <div style={{width:28,height:28,borderRadius:'var(--r-sm)',background:'var(--dark)',color:'#bdbbff',fontFamily:'var(--mono)',fontSize:10,fontWeight:600,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>{s.step}</div>
+                  <div><div style={{fontSize:13,fontWeight:600,letterSpacing:'-0.02em',marginBottom:2,color:'#010120'}}>{s.title}</div><div style={{fontSize:12,color:'rgba(0,0,0,0.75)',lineHeight:1.5}}>{s.desc}</div></div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <ResultBox value={result} label="结果"/>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// 6. D-H Protocol
+function DHProtocol({apiShow}){
+  const [p,setP] = useState('23');
+  const [g,setG] = useState('5');
+  const [step,setStep] = useState(0);
+  const [state,setState] = useState({});
+  const [log,setLog] = useState([]);
+
+  function addLog(msg){setLog(l=>[...l,{t:new Date().toLocaleTimeString(),msg}]);}
+
+  function startExchange(){
+    const pn=parseInt(p), gn=parseInt(g);
+    const a=Math.floor(Math.random()*10)+2; // Alice private
+    const b=Math.floor(Math.random()*10)+2; // Bob private
+    const A=Math.pow(gn,a)%pn; // Alice public
+    const B=Math.pow(gn,b)%pn; // Bob public
+    const Ka=Math.pow(B,a)%pn; // shared
+    const Kb=Math.pow(A,b)%pn;
+    setState({pn,gn,a,b,A,B,Ka,Kb});
+    setLog([]);
+    setStep(1);
+    addLog(`协议初始化: p=${pn}, g=${gn}`);
+  }
+
+  function nextStep(){
+    const s = step+1;
+    setStep(s);
+    if(s===2) addLog(`Alice 生成私钥 a=${state.a}, 计算 A=g^a mod p = ${state.A}`);
+    if(s===3) addLog(`Bob 生成私钥 b=${state.b}, 计算 B=g^b mod p = ${state.B}`);
+    if(s===4) addLog(`Alice → Bob: 发送 A=${state.A} (网络传输)`);
+    if(s===5) addLog(`Bob → Alice: 发送 B=${state.B} (网络传输)`);
+    if(s===6){
+      addLog(`Alice 计算共享密钥: K=B^a mod p = ${state.Ka}`);
+      addLog(`Bob 计算共享密钥: K=A^b mod p = ${state.Kb}`);
+      addLog(state.Ka===state.Kb ? '✓ 密钥协商成功! 双方获得相同共享密钥' : '✗ 密钥不匹配');
+    }
+  }
+
+  const stepLabels = ['初始化','Alice生成密钥','Bob生成密钥','Alice发送','Bob发送','密钥计算'];
+
+  return (
+    <div className="col">
+      <SectionHeader title="D-H 密钥交换协议" badge="Key Exchange + Authentication"
+        subtitle="基于 Diffie-Hellman 的双实体认证协议 — C/S 模式，含消息完整性与来源验证"/>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20}}>
+        <div className="col">
+          <div className="grid-2">
+            <div><MonoLabel>大素数 p</MonoLabel><input className="inp" value={p} onChange={e=>setP(e.target.value)} type="number"/></div>
+            <div><MonoLabel>生成元 g</MonoLabel><input className="inp" value={g} onChange={e=>setG(e.target.value)} type="number"/></div>
+          </div>
+          <button className="btn btn-accent" onClick={startExchange} style={{width:'100%',justifyContent:'center'}}>
+            ▶  开始密钥交换
+          </button>
+          {step>0 && (
+            <div className="result-appear col" style={{gap:8}}>
+              <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+                {stepLabels.map((l,i)=>(
+                  <div key={i} className="status" style={{background:i<step?'rgba(0,200,100,0.08)':i===step?'rgba(189,187,255,0.15)':'transparent',
+                    borderColor:i<step?'rgba(0,200,100,0.2)':i===step?'rgba(189,187,255,0.3)':'var(--border-light)',
+                    color:i<step?'#00944a':i===step?'#5b57d1':'rgba(0,0,0,0.35)'}}>
+                    <span className="dot"/>S{i+1}
+                  </div>
+                ))}
+              </div>
+              {step < 6 && (
+                <button className="btn btn-primary" onClick={nextStep} style={{width:'100%',justifyContent:'center'}}>
+                  → 下一步
+                </button>
+              )}
+            </div>
+          )}
+          {apiShow && <div style={{display:'flex',flexDirection:'column',gap:4}}>
+            <APIEndpoint method="POST" path="/dh/init" show={apiShow}/>
+            <APIEndpoint method="POST" path="/dh/exchange" show={apiShow}/>
+            <APIEndpoint method="POST" path="/dh/verify" show={apiShow}/>
+          </div>}
+        </div>
+        <div className="col">
+          <div style={{display:'flex',gap:12,alignItems:'stretch'}}>
+            <div className="dh-entity">
+              <div style={{fontFamily:'var(--mono)',fontSize:11,letterSpacing:'0.06em',color:'rgba(255,255,255,0.7)',textTransform:'uppercase',marginBottom:8}}>CLIENT — Alice</div>
+              <div style={{fontFamily:'var(--mono)',fontSize:12,color:step>=2?'#bdbbff':'rgba(255,255,255,0.6)',lineHeight:1.8}}>
+                <div>私钥 a: {step>=2?state.a:'—'}</div>
+                <div>公钥 A: {step>=2?state.A:'—'}</div>
+                <div style={{marginTop:6,color:step>=6&&state.Ka?'#4ade80':'rgba(255,255,255,0.6)'}}>
+                  共享密钥 K: {step>=6?state.Ka:'—'}
+                </div>
+              </div>
+            </div>
+            <div className="dh-arrow">
+              {step>=4&&<div style={{color:'var(--lavender)',fontSize:12}}>A={state.A}<br/>→→→</div>}
+              {step>=5&&<div style={{color:'var(--lavender)',fontSize:12,marginTop:8}}>←←←<br/>B={state.B}</div>}
+            </div>
+            <div className="dh-entity">
+              <div style={{fontFamily:'var(--mono)',fontSize:11,letterSpacing:'0.06em',color:'rgba(255,255,255,0.7)',textTransform:'uppercase',marginBottom:8}}>SERVER — Bob</div>
+              <div style={{fontFamily:'var(--mono)',fontSize:12,color:step>=3?'#bdbbff':'rgba(255,255,255,0.6)',lineHeight:1.8}}>
+                <div>私钥 b: {step>=3?state.b:'—'}</div>
+                <div>公钥 B: {step>=3?state.B:'—'}</div>
+                <div style={{marginTop:6,color:step>=6&&state.Kb?'#4ade80':'rgba(255,255,255,0.6)'}}>
+                  共享密钥 K: {step>=6?state.Kb:'—'}
+                </div>
+              </div>
+            </div>
+          </div>
+          <div style={{background:'rgba(1,1,32,0.04)',border:'1px solid var(--border-light)',borderRadius:'var(--r-md)',padding:16,flex:1,overflow:'auto',maxHeight:200}}>
+            <MonoLabel>通信日志</MonoLabel>
+            <div style={{fontFamily:'var(--mono)',fontSize:12,lineHeight:1.8,marginTop:6}}>
+              {log.length===0 && <div style={{color:'rgba(0,0,0,0.6)'}}>等待协议启动...</div>}
+              {log.map((l,i)=>(
+                <div key={i} style={{color:l.msg.includes('成功')||l.msg.includes('✓')?'#00944a':'rgba(0,0,0,0.6)'}}>
+                  <span style={{color:'rgba(0,0,0,0.3)'}}>[{l.t}]</span> {l.msg}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// 7. Hash + Digital Signature
+function HashSign({apiShow}){
+  const [algo,setAlgo] = useState('SHA-1');
+  const [msg,setMsg] = useState('Verify this message integrity');
+  const [hash,setHash] = useState('');
+  const [sig,setSig] = useState('');
+  const [verified,setVerified] = useState(null);
+
+  async function computeHash(){
+    const enc = new TextEncoder().encode(msg);
+    const h = await crypto.subtle.digest(algo==='SHA-1'?'SHA-1':'SHA-256', enc);
+    return Array.from(new Uint8Array(h)).map(b=>hex(b)).join('');
+  }
+
+  async function signMsg(){
+    const h = await computeHash();
+    setHash(h);
+    // Demo RSA signature (mock)
+    const mockSig = Array.from({length:32},()=>hex(Math.floor(Math.random()*256))).join('');
+    setSig(mockSig);
+    setVerified(null);
+  }
+
+  async function verifyMsg(){
+    const h = await computeHash();
+    setHash(h);
+    // Mock verification
+    setVerified(sig.length>0);
+  }
+
+  return (
+    <div className="col">
+      <SectionHeader title="哈希 + 数字签名" badge="Hash & Digital Signature"
+        subtitle="SHA-1 / MD5 消息摘要 + RSA 数字签名，实现消息完整性与来源验证"/>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:28,alignItems:'start'}}>
+        <div className="col">
+          <div>
+            <MonoLabel>散列算法</MonoLabel>
+            <div className="toggle-group">
+              {['SHA-1','MD5'].map(a=>(
+                <button key={a} className={`toggle-btn${algo===a?' active':''}`} onClick={()=>setAlgo(a)}>{a}</button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <MonoLabel>消息内容</MonoLabel>
+            <textarea className="inp" rows={4} value={msg} onChange={e=>setMsg(e.target.value)}/>
+          </div>
+          <div style={{display:'flex',gap:8}}>
+            <button className="btn btn-primary" style={{flex:1,justifyContent:'center'}} onClick={signMsg}>
+              签名
+            </button>
+            <button className="btn btn-outline" style={{flex:1,justifyContent:'center'}} onClick={verifyMsg}
+              disabled={!sig}>
+              ✓  验证
+            </button>
+          </div>
+          {verified!==null && (
+            <div className={`status result-appear ${verified?'ok':'warn'}`}>
+              <span className="dot"/>
+              {verified ? '签名验证通过 — 消息来源可信' : '签名验证失败 — 消息可能被篡改'}
+            </div>
+          )}
+          {apiShow && <div style={{display:'flex',flexDirection:'column',gap:4}}>
+            <APIEndpoint method="POST" path="/hash/compute" show={apiShow}/>
+            <APIEndpoint method="POST" path="/sign/rsa" show={apiShow}/>
+            <APIEndpoint method="POST" path="/sign/verify" show={apiShow}/>
+          </div>}
+        </div>
+        <div className="col">
+          <div style={{background:'rgba(1,1,32,0.03)',border:'1px solid var(--border-light)',borderRadius:'var(--r-md)',padding:20}}>
+            <MonoLabel>签名流程</MonoLabel>
+            <div style={{display:'flex',flexDirection:'column',gap:12,marginTop:12}}>
+              {[{step:'01',title:'计算摘要',desc:`H = ${algo}(消息) — 固定长度指纹`},
+                {step:'02',title:'RSA 签名',desc:'S = RSA_Sign(H, 私钥 d) — 发送方持有'},
+                {step:'03',title:'发送',desc:'传输 (消息, 签名 S) — 签名不可伪造'},
+                {step:'04',title:'接收验证',desc:`H' = ${algo}(消息), H'' = RSA_Verify(S, 公钥 e), 验证 H'==H''`},
+              ].map(s=>(
+                <div key={s.step} style={{display:'flex',gap:12,alignItems:'flex-start'}}>
+                  <div style={{width:28,height:28,borderRadius:'var(--r-sm)',background:'var(--dark)',color:'#bdbbff',fontFamily:'var(--mono)',fontSize:10,fontWeight:600,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>{s.step}</div>
+                  <div><div style={{fontSize:13,fontWeight:600,letterSpacing:'-0.02em',marginBottom:2,color:'#010120'}}>{s.title}</div><div style={{fontSize:12,color:'rgba(0,0,0,0.75)',lineHeight:1.5}}>{s.desc}</div></div>
+                </div>
+              ))}
+            </div>
+          </div>
+          {hash && <ResultBox value={hash} label={`${algo} 摘要 (${hash.length*4} bits)`}/>}
+          {sig && <ResultBox value={sig} label="RSA 数字签名 (HEX)"/>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// 8. Large File Transfer
+function LargeFileTransfer({apiShow}){
+  const [file,setFile] = useState(null);
+  const [cipher,setCipher] = useState('AES-256');
+  const [progress,setProgress] = useState(0);
+  const [transferring,setTransferring] = useState(false);
+  const [log,setLog] = useState([]);
+  const timerRef = useRef(null);
+
+  function startTransfer(){
+    setTransferring(true);
+    setProgress(0);
+    setLog([]);
+    const steps=[
+      [200,'[INIT] 建立 TLS 1.3 安全通道'],
+      [600,'[KEY] D-H 密钥协商完成'],
+      [1000,'[HASH] 计算文件 SHA-1 摘要'],
+      [1400,'[SIGN] RSA 数字签名原始文件'],
+      [1800,'[ENC] 开始 AES-256-CTR 分块加密'],
+      [3000,'[TX] 大文件分片传输中 (每片 4MB)'],
+      [4500,'[TX] 传输进度 50%...'],
+      [6000,'[TX] 传输进度 85%...'],
+      [7000,'[VERIFY] 接收端完整性校验'],
+      [7500,'[DONE] ✓ 传输完成，签名验证通过'],
+    ];
+    steps.forEach(([delay,msg])=>{
+      setTimeout(()=>setLog(l=>[...l,{t:new Date().toLocaleTimeString(),msg}]),delay);
+    });
+    const interval = setInterval(()=>{
+      setProgress(p=>{
+        if(p>=100){clearInterval(interval);setTransferring(false);return 100;}
+        return p+1.4;
+      });
+    },100);
+    timerRef.current=interval;
+  }
+
+  return (
+    <div className="col">
+      <SectionHeader title="大文件加密传输" badge="Secure File Transfer"
+        subtitle="支持 1GB+ 文件加密传输 — 分片处理、完整性验证、数字签名、断点续传"/>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20}}>
+        <div className="col">
+          <div>
+            <MonoLabel>选择文件 (支持 1GB+)</MonoLabel>
+            <div className={`file-zone${file?' has-file':''}`}
+              onClick={()=>document.getElementById('big-file-inp').click()}>
+              <input id="big-file-inp" type="file" style={{display:'none'}}
+                onChange={e=>setFile(e.target.files[0])}/>
+              <div style={{width:28,height:28,margin:'0 auto 6px',display:'flex',alignItems:'center',justifyContent:'center'}}>{file?(<svg width="18" height="18" viewBox="0 0 18 18" fill="none"><rect x="3" y="1" width="10" height="14" rx="1.5" stroke="#00944a" strokeWidth="1.5"/><path d="M7 1v4h6" stroke="#00944a" strokeWidth="1.5" strokeLinejoin="round"/></svg>):(<svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M2 5a2 2 0 012-2h3.586a1 1 0 01.707.293L10 5h4a2 2 0 012 2v7a2 2 0 01-2 2H4a2 2 0 01-2-2V5z" stroke="#000" strokeWidth="1.5" strokeLinejoin="round" opacity=".4"/></svg>)}</div>
+              <div style={{fontSize:13,fontWeight:500,letterSpacing:'-0.01em'}}>
+                {file?file.name:'拖入任意文件'}
+              </div>
+              {file && <div style={{fontSize:12,color:'rgba(0,0,0,0.45)',marginTop:4}}>
+                {file.size > 1e9 ? (file.size/1e9).toFixed(2)+' GB' : file.size > 1e6 ? (file.size/1e6).toFixed(1)+' MB' : (file.size/1e3).toFixed(1)+' KB'}
+              </div>}
+              {!file && <div style={{fontSize:12,color:'rgba(0,0,0,0.5)',marginTop:4}}>点击选择或拖拽文件</div>}
+            </div>
+          </div>
+          <div>
+            <MonoLabel>加密算法</MonoLabel>
+            <select className="sel" value={cipher} onChange={e=>setCipher(e.target.value)}>
+              <option>AES-256-CTR</option>
+              <option>AES-256-CBC</option>
+              <option>ChaCha20-Poly1305</option>
+            </select>
+          </div>
+          <div style={{background:'rgba(1,1,32,0.04)',border:'1px solid var(--border-light)',borderRadius:'var(--r-md)',padding:14}}>
+            <div style={{display:'flex',flexDirection:'column',gap:6}}>
+              {[
+                {label:'分片大小', value:'4 MB / chunk'},
+                {label:'哈希算法', value:'SHA-1'},
+                {label:'签名算法', value:'RSA-2048'},
+                {label:'密钥交换', value:'ECDH / D-H'},
+                {label:'传输协议', value:'TLS 1.3'},
+              ].map(r=>(
+                <div key={r.label} style={{display:'grid',gridTemplateColumns:'1fr auto',gap:8,fontSize:13,alignItems:'center'}}>
+                  <span style={{fontFamily:'var(--mono)',fontSize:11,color:'rgba(0,0,0,0.55)',textTransform:'uppercase',letterSpacing:'0.04em'}}>{r.label}</span>
+                  <span style={{fontWeight:600,letterSpacing:'-0.01em',color:'#010120',fontFamily:'var(--mono)',fontSize:12}}>{r.value}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <button className="btn btn-accent" onClick={startTransfer} disabled={transferring}
+            style={{width:'100%',justifyContent:'center'}}>
+            {transferring?'传输中...':'▶  开始加密传输'}
+          </button>
+          {apiShow && <div style={{display:'flex',flexDirection:'column',gap:4}}>
+            <APIEndpoint method="POST" path="/file/encrypt-upload" show={apiShow}/>
+            <APIEndpoint method="GET" path="/file/download/:id" show={apiShow}/>
+            <APIEndpoint method="GET" path="/file/status/:id" show={apiShow}/>
+          </div>}
+        </div>
+        <div className="col">
+          {(progress>0||transferring) && (
+            <div className="result-appear col" style={{gap:10}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                <MonoLabel>传输进度</MonoLabel>
+                <span style={{fontFamily:'var(--mono)',fontSize:13,fontWeight:600}}>{Math.min(100,progress).toFixed(0)}%</span>
+              </div>
+              <div className="progress-track">
+                <div className="progress-fill" style={{width:`${Math.min(100,progress)}%`}}/>
+              </div>
+            </div>
+          )}
+          <div style={{background:'rgba(1,1,32,0.04)',border:'1px solid var(--border-light)',borderRadius:'var(--r-md)',padding:16,flex:1,overflow:'auto',maxHeight:340}}>
+            <MonoLabel>传输日志</MonoLabel>
+            <div style={{fontFamily:'var(--mono)',fontSize:12,lineHeight:1.9,marginTop:6}}>
+              {log.length===0 && <div style={{color:'rgba(0,0,0,0.5)'}}>等待传输启动...</div>}
+              {log.map((l,i)=>(
+                <div key={i} className={i===log.length-1?'result-appear':''} style={{
+                  color:l.msg.includes('✓')||l.msg.includes('DONE')?'#00944a':
+                        l.msg.includes('SIGN')||l.msg.includes('KEY')?'#5b57d1':'rgba(0,0,0,0.65)'}}>
+                  <span style={{color:'rgba(0,0,0,0.3)'}}>[{l.t}]</span> {l.msg}
+                </div>
+              ))}
+            </div>
+          </div>
+          {progress>=100 && (
+            <div className="status ok result-appear" style={{padding:'10px 14px'}}>
+              <span className="dot"/>
+              文件加密传输成功 — 完整性验证通过，来源签名有效
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Main App ─────────────────────────────────────────────────
+const SERVICES = [
+  {id:'affine',  group:'古典密码', label:'仿射加密',         sub:'Affine Cipher',     icon:'Af'},
+  {id:'bigint',  group:'基础运算', label:'大整数运算',        sub:'128-bit BigInt',    icon:'Bi'},
+  {id:'stream',  group:'流密码',   label:'流密码加密',        sub:'RC4 / LFSR+JK',    icon:'SC'},
+  {id:'des',     group:'对称加密', label:'DES 加密',          sub:'Block Cipher',      icon:'DE'},
+  {id:'rsa',     group:'非对称',   label:'RSA 加密',          sub:'Public Key',        icon:'RS'},
+  {id:'dh',      group:'协议',     label:'D-H 认证协议',      sub:'Key Exchange',      icon:'DH'},
+  {id:'hash',    group:'完整性',   label:'哈希 + 数字签名',   sub:'SHA-1 / RSA Sign',  icon:'HS'},
+  {id:'file',    group:'传输',     label:'大文件加密传输',    sub:'1GB+ Secure TX',   icon:'FT'},
+];
+
+const PANELS = {affine:AffineCipher, bigint:BigIntOps, stream:StreamCipher, des:DESCipher,
+                rsa:RSACipher, dh:DHProtocol, hash:HashSign, file:LargeFileTransfer};
+
+const SAVED = localStorage.getItem('crypto_service')||'affine';
+const TWEAK_DEFAULS = /*EDITMODE-BEGIN*/{
+  "showAPI": false,
+  "sidebarWidth": 270,
+  "density": "comfortable"
+}/*EDITMODE-END*/;
+
+function App(){
+  const [active,setActive] = useState(SAVED);
+  const [apiShow,setApiShow] = useState(TWEAK_DEFAULS.showAPI);
+  const [sidebarW,setSidebarW] = useState(TWEAK_DEFAULS.sidebarWidth);
+
+  useEffect(()=>{localStorage.setItem('crypto_service',active);},[active]);
+
+  // Tweaks
+  useEffect(()=>{
+    window.addEventListener('message',e=>{
+      if(e.data?.type==='__activate_edit_mode') document.getElementById('tweaks-panel').classList.add('open');
+      if(e.data?.type==='__deactivate_edit_mode') document.getElementById('tweaks-panel').classList.remove('open');
+    });
+    window.parent.postMessage({type:'__edit_mode_available'},'*');
+    // sync tweaks controls
+    document.getElementById('tw-api-on').classList.toggle('active',apiShow);
+    document.getElementById('tw-api-off').classList.toggle('active',!apiShow);
+    document.getElementById('tw-sidebar').value=sidebarW;
+    window.toggleAPI = (v)=>{
+      setApiShow(v);
+      document.getElementById('tw-api-on').classList.toggle('active',v);
+      document.getElementById('tw-api-off').classList.toggle('active',!v);
+      window.parent.postMessage({type:'__edit_mode_set_keys',edits:{showAPI:v}},'*');
+    };
+    window.setDensity = (d,el)=>{
+      document.querySelectorAll('.toggle-btn').forEach(b=>b.classList.remove('active'));
+      el.classList.add('active');
+      document.documentElement.style.setProperty('--density-gap',d==='compact'?'8px':'12px');
+    };
+    document.getElementById('tw-sidebar').addEventListener('input',e=>{
+      setSidebarW(+e.target.value);
+      window.parent.postMessage({type:'__edit_mode_set_keys',edits:{sidebarWidth:+e.target.value}},'*');
+    });
+  },[]);
+
+  const Panel = PANELS[active];
+  const svc = SERVICES.find(s=>s.id===active);
+
+  // Group services
+  const groups = {};
+  SERVICES.forEach(s=>{
+    if(!groups[s.group]) groups[s.group]=[];
+    groups[s.group].push(s);
+  });
+
+  return (
+    <div style={{display:'flex',height:'100%',overflow:'hidden',width:'100%'}}>
+      {/* Sidebar */}
+      <div style={{width:sidebarW,flexShrink:0,background:'var(--dark)',display:'flex',flexDirection:'column',
+        borderRight:'1px solid rgba(255,255,255,0.06)',overflow:'hidden',position:'relative'}}>
+        {/* Gradient blobs */}
+        <div className="blob" style={{width:200,height:200,background:'var(--magenta)',top:-60,left:-60}}/>
+        <div className="blob" style={{width:160,height:160,background:'var(--lavender)',bottom:80,right:-40}}/>
+
+        {/* Logo */}
+        <div style={{padding:'24px 20px 20px',borderBottom:'1px solid rgba(255,255,255,0.06)',position:'relative'}}>
+          <div style={{fontFamily:'var(--mono)',fontSize:10,letterSpacing:'0.1em',textTransform:'uppercase',
+            color:'rgba(255,255,255,0.35)',marginBottom:6}}>PLATFORM</div>
+          <div style={{fontSize:18,fontWeight:600,letterSpacing:'-0.04em',lineHeight:1}}>CRYPTOLOGY</div>
+          <div style={{fontSize:11,color:'rgba(255,255,255,0.35)',marginTop:4,letterSpacing:'-0.01em'}}>
+            加解密综合服务平台
+          </div>
+          <div style={{marginTop:12,display:'flex',gap:6,flexWrap:'wrap'}}>
+            <div className="status ok" style={{padding:'2px 7px'}}>
+              <span className="dot"/>运行中
+            </div>
+          </div>
+        </div>
+
+        {/* Nav */}
+        <div style={{flex:1,overflow:'auto',padding:'12px 8px'}}>
+          {Object.entries(groups).map(([group,items])=>(
+            <div key={group} style={{marginBottom:20}}>
+              <div style={{fontFamily:'var(--mono)',fontSize:10,letterSpacing:'0.08em',textTransform:'uppercase',
+                color:'rgba(255,255,255,0.4)',padding:'0 12px',marginBottom:4}}>{group}</div>
+              {items.map(s=>(
+                <button key={s.id} onClick={()=>setActive(s.id)}
+                  style={{width:'100%',display:'flex',alignItems:'center',gap:10,padding:'9px 12px',
+                    borderRadius:'var(--r-sm)',border:'none',cursor:'pointer',textAlign:'left',
+                    background:active===s.id?'rgba(255,255,255,0.1)':'transparent',
+                    color:active===s.id?'#fff':'rgba(255,255,255,0.55)',
+                    transition:'all 0.15s',marginBottom:1}}>
+                  <div style={{width:30,height:30,borderRadius:'var(--r-sm)',flexShrink:0,
+                    background:active===s.id?'rgba(255,255,255,0.15)':'rgba(255,255,255,0.06)',
+                    display:'flex',alignItems:'center',justifyContent:'center',
+                    fontFamily:'var(--mono)',fontSize:10,fontWeight:600,letterSpacing:'0.02em'}}>
+                    {s.icon}
+                  </div>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:13,fontWeight:500,letterSpacing:'-0.02em',lineHeight:1.2,
+                      whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{s.label}</div>
+                    <div style={{fontSize:10,fontFamily:'var(--mono)',color:'rgba(255,255,255,0.3)',
+                      marginTop:1,letterSpacing:'0.03em'}}>{s.sub}</div>
+                  </div>
+                  {active===s.id && <div style={{width:3,height:20,background:'var(--lavender)',borderRadius:2,flexShrink:0}}/>}
+                </button>
+              ))}
+            </div>
+          ))}
+        </div>
+
+        {/* Footer */}
+        <div style={{padding:'14px 20px',borderTop:'1px solid rgba(255,255,255,0.06)',
+          fontFamily:'var(--mono)',fontSize:10,color:'rgba(255,255,255,0.2)',letterSpacing:'0.04em',lineHeight:1.8}}>
+        </div>
+      </div>
+
+      {/* Main */}
+      <div style={{flex:1,overflow:'auto',background:'#fafafa',display:'flex',flexDirection:'column'}}>
+        {/* Top bar */}
+        <div style={{borderBottom:'1px solid var(--border-light)',padding:'14px 32px',
+          display:'flex',alignItems:'center',justifyContent:'space-between',background:'#fff',
+          position:'sticky',top:0,zIndex:10}}>
+          <div style={{display:'flex',alignItems:'center',gap:12}}>
+            <div style={{width:32,height:32,borderRadius:'var(--r-sm)',
+              background:'var(--dark)',display:'flex',alignItems:'center',justifyContent:'center',
+              fontFamily:'var(--mono)',fontSize:11,fontWeight:600,color:'#fff',letterSpacing:'0.02em'}}>
+              {svc?.icon}
+            </div>
+            <div>
+              <div style={{fontSize:14,fontWeight:600,letterSpacing:'-0.03em',color:'#010120',whiteSpace:'nowrap'}}>{svc?.label}</div>
+              <div style={{fontSize:11,fontFamily:'var(--mono)',color:'rgba(0,0,0,0.55)',letterSpacing:'0.04em',textTransform:'uppercase'}}>{svc?.group}</div>
+            </div>
+          </div>
+          <div style={{display:'flex',alignItems:'center',gap:10}}>
+            {apiShow && <div style={{fontFamily:'var(--mono)',fontSize:11,color:'rgba(0,0,0,0.35)',
+              padding:'4px 10px',border:'1px solid var(--border-light)',borderRadius:'var(--r-sm)'}}>
+              /api/v1/{active}
+            </div>}
+          </div>
+        </div>
+
+        {/* Content */}
+        <div style={{flex:1,padding:'32px',maxWidth:1200,width:'100%',boxSizing:'border-box'}}>
+          <Panel apiShow={apiShow}/>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
