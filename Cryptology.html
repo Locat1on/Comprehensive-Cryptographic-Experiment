@@ -239,6 +239,41 @@ textarea.inp{resize:vertical;min-height:80px;line-height:1.5;}
 <script type="text/babel">
 const { useState, useRef, useEffect, useCallback } = React;
 
+// ── Backend API ──────────────────────────────────────────────
+// TODO(backend): 将此地址改为实际部署地址
+const API_BASE = 'http://localhost:8080/api/v1';
+
+// 通用请求封装。path: '/des/encrypt' 等；body: 请求体对象
+// 失败时抛出 Error，调用方 catch 后展示友好提示
+async function apiCall(path, body = {}) {
+  let res;
+  try {
+    res = await fetch(`${API_BASE}${path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  } catch {
+    throw new Error('⚠ 后端未连接 — 请先启动 Crow 服务器 (localhost:8080)');
+  }
+  if (!res.ok) {
+    const text = await res.text().catch(()=>'');
+    throw new Error(`服务器错误 HTTP ${res.status}${text ? ': ' + text : ''}`);
+  }
+  return res.json();
+}
+
+async function apiGet(path) {
+  let res;
+  try {
+    res = await fetch(`${API_BASE}${path}`);
+  } catch {
+    throw new Error('⚠ 后端未连接 — 请先启动 Crow 服务器 (localhost:8080)');
+  }
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
 // ── Utility helpers ──────────────────────────────────────────
 function copyText(t) {
   navigator.clipboard?.writeText(t).catch(()=>{});
@@ -636,15 +671,21 @@ function DESCipher({apiShow}){
   const [mode,setMode] = useState('encrypt');
   const [result,setResult] = useState('');
 
-  // Simplified DES demo (real DES requires full implementation on backend)
-  function simulate(){
-    const k = key.replace(/\s/g,'');
-    const p = plaintext.replace(/\s/g,'');
-    // Show interface/mock for demo — real impl on backend
-    const mock = mode==='encrypt'
-      ? Array.from({length:Math.ceil(p.length/2)},()=>hex(Math.floor(Math.random()*256))).join(' ')
-      : Array.from({length:p.length/2},(_,i)=>hex(parseInt(p.slice(i*2,i*2+2)||'41',16)^0x20)).join(' ');
-    setResult(`[DEMO] ${mock}\n\n// 后端接口: POST /api/v1/des/${mode}\n// 实际 DES 运算在服务器端执行`);
+  // TODO(backend): 实现 POST /api/v1/des/encrypt 和 /api/v1/des/decrypt
+  // 请求体: { data: string(HEX), key: string(HEX 16字符), mode: "ECB"|"CBC", iv?: string }
+  // 响应体: { result: string(HEX) }
+  async function simulate(){
+    setResult('处理中...');
+    try {
+      const json = await apiCall(`/des/${mode}`, {
+        data: plaintext.replace(/\s/g,''),
+        key:  key.replace(/\s/g,''),
+        mode: 'ECB',
+      });
+      setResult(json.result ?? JSON.stringify(json));
+    } catch(e) {
+      setResult(e.message);
+    }
   }
 
   return (
@@ -931,20 +972,35 @@ function HashSign({apiShow}){
     return Array.from(new Uint8Array(h)).map(b=>hex(b)).join('');
   }
 
+  // TODO(backend): 实现 POST /api/v1/sign/rsa
+  // 请求体: { message: string, algo: "SHA1"|"MD5", key: { n, e, d } }
+  // 响应体: { signature: string(HEX), hash: string(HEX) }
   async function signMsg(){
     const h = await computeHash();
     setHash(h);
-    // Demo RSA signature (mock)
-    const mockSig = Array.from({length:32},()=>hex(Math.floor(Math.random()*256))).join('');
-    setSig(mockSig);
+    setSig('');
     setVerified(null);
+    try {
+      const json = await apiCall('/sign/rsa', { message: msg, algo: algo.replace('-','') });
+      setSig(json.signature);
+    } catch(e) {
+      setSig(e.message);
+    }
   }
 
+  // TODO(backend): 实现 POST /api/v1/sign/verify
+  // 请求体: { message: string, signature: string(HEX), algo: "SHA1"|"MD5", key: { n, e } }
+  // 响应体: { valid: boolean, hash: string(HEX) }
   async function verifyMsg(){
     const h = await computeHash();
     setHash(h);
-    // Mock verification
-    setVerified(sig.length>0);
+    try {
+      const json = await apiCall('/sign/verify', { message: msg, signature: sig, algo: algo.replace('-','') });
+      setVerified(json.valid);
+    } catch(e) {
+      setSig(e.message);
+      setVerified(false);
+    }
   }
 
   return (
@@ -1019,32 +1075,60 @@ function LargeFileTransfer({apiShow}){
   const [log,setLog] = useState([]);
   const timerRef = useRef(null);
 
-  function startTransfer(){
+  // TODO(backend): 实现 POST /api/v1/file/encrypt-upload (multipart/form-data)
+  //   字段: file=<binary>, cipher=<string>, chunk_size=4194304
+  //   响应: { id: string, chunks: number, hash: string }
+  // TODO(backend): 实现 GET /api/v1/file/status/:id
+  //   响应: { id, progress: number(0-100), status: "pending"|"transferring"|"done"|"error" }
+  // TODO(backend): 实现 GET /api/v1/file/download/:id
+  //   响应: 加密后的文件流 (Content-Type: application/octet-stream)
+  async function startTransfer(){
+    if(!file){ setLog([{t:new Date().toLocaleTimeString(),msg:'[ERROR] 请先选择文件'}]); return; }
     setTransferring(true);
     setProgress(0);
-    setLog([]);
-    const steps=[
-      [200,'[INIT] 建立 TLS 1.3 安全通道'],
-      [600,'[KEY] D-H 密钥协商完成'],
-      [1000,'[HASH] 计算文件 SHA-1 摘要'],
-      [1400,'[SIGN] RSA 数字签名原始文件'],
-      [1800,'[ENC] 开始 AES-256-CTR 分块加密'],
-      [3000,'[TX] 大文件分片传输中 (每片 4MB)'],
-      [4500,'[TX] 传输进度 50%...'],
-      [6000,'[TX] 传输进度 85%...'],
-      [7000,'[VERIFY] 接收端完整性校验'],
-      [7500,'[DONE] ✓ 传输完成，签名验证通过'],
-    ];
-    steps.forEach(([delay,msg])=>{
-      setTimeout(()=>setLog(l=>[...l,{t:new Date().toLocaleTimeString(),msg}]),delay);
-    });
-    const interval = setInterval(()=>{
-      setProgress(p=>{
-        if(p>=100){clearInterval(interval);setTransferring(false);return 100;}
-        return p+1.4;
+    setLog([{t:new Date().toLocaleTimeString(),msg:'[INIT] 连接后端服务器...'}]);
+
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      form.append('cipher', cipher);
+      form.append('chunk_size', '4194304');
+
+      let res;
+      try {
+        res = await fetch(`${API_BASE}/file/encrypt-upload`, { method:'POST', body: form });
+      } catch {
+        throw new Error('⚠ 后端未连接 — 请先启动 Crow 服务器 (localhost:8080)');
+      }
+      if(!res.ok) throw new Error(`服务器错误 HTTP ${res.status}`);
+      const { id } = await res.json();
+      setLog(l=>[...l,{t:new Date().toLocaleTimeString(),msg:`[UPLOAD] 任务 ID: ${id}，开始轮询进度...`}]);
+
+      // 轮询进度
+      await new Promise((resolve, reject) => {
+        const poll = setInterval(async () => {
+          try {
+            const st = await apiGet(`/file/status/${id}`);
+            setProgress(st.progress ?? 0);
+            setLog(l=>[...l,{t:new Date().toLocaleTimeString(),msg:`[TX] 进度 ${st.progress}% — ${st.status}`}]);
+            if(st.status==='done'||st.progress>=100){
+              clearInterval(poll);
+              setLog(l=>[...l,{t:new Date().toLocaleTimeString(),msg:'[DONE] ✓ 传输完成，签名验证通过'}]);
+              setProgress(100);
+              resolve();
+            } else if(st.status==='error'){
+              clearInterval(poll);
+              reject(new Error('服务端处理失败'));
+            }
+          } catch(e){ clearInterval(poll); reject(e); }
+        }, 1500);
+        timerRef.current = poll;
       });
-    },100);
-    timerRef.current=interval;
+    } catch(e) {
+      setLog(l=>[...l,{t:new Date().toLocaleTimeString(),msg:`[ERROR] ${e.message}`}]);
+    } finally {
+      setTransferring(false);
+    }
   }
 
   return (
