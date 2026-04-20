@@ -8,7 +8,7 @@ $GXX = if ($env:GXX) { $env:GXX } elseif (Get-Command g++ -ErrorAction SilentlyC
 $AR = if ($env:AR) { $env:AR } elseif (Get-Command ar -ErrorAction SilentlyContinue) { "ar" }
 
 # 检测 MSYS2 路径
-$MSYS2_ROOT = if ($env:MSYS2_ROOT) { $env:MSYS2_ROOT } elseif (Test-Path "F:\msys2\mingw64") { "F:\msys2\mingw64" } else { "" }
+$MSYS2_ROOT = if ($env:MSYS2_ROOT) { $env:MSYS2_ROOT }
 
 $INC = @("-Icrypto\include", "-Ilib")
 if ($MSYS2_ROOT) { $INC += "-I$MSYS2_ROOT\include" }
