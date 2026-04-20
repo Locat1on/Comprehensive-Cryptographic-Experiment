@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>CRYPTOLOGY — 加解密综合服务平台</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/styles.css">
+
+<!-- React + Babel -->
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<!-- 工具层（纯 JS，无 JSX） -->
+<script src="js/api.js"></script>
+<script src="js/utils.js"></script>
+</head>
+<body>
+<div id="root"></div>
+
+<!-- Tweaks 面板 -->
+<div id="tweaks-panel">
+  <h3>Tweaks</h3>
+  <div style="display:flex;flex-direction:column;gap:12px;">
+    <div>
+      <label class="label">Sidebar Width</label>
+      <input type="range" min="200" max="320" value="270" id="tw-sidebar" style="width:100%;">
+    </div>
+    <div>
+      <label class="label">Content Density</label>
+      <div class="toggle-group">
+        <button class="toggle-btn active" onclick="setDensity('comfortable',this)">Comfortable</button>
+        <button class="toggle-btn" onclick="setDensity('compact',this)">Compact</button>
+      </div>
+    </div>
+    <div>
+      <label class="label">Show API Endpoints</label>
+      <div class="toggle-group">
+        <button class="toggle-btn active" id="tw-api-on" onclick="toggleAPI(true)">Show</button>
+        <button class="toggle-btn" id="tw-api-off" onclick="toggleAPI(false)">Hide</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 公共组件 -->
+<script type="text/babel" src="js/components.jsx"></script>
+
+<!-- 功能面板（每个模块独立文件） -->
+<script type="text/babel" src="js/panels/affine.jsx"></script>
+<script type="text/babel" src="js/panels/bigint.jsx"></script>
+<script type="text/babel" src="js/panels/stream.jsx"></script>
+<script type="text/babel" src="js/panels/des.jsx"></script>
+<script type="text/babel" src="js/panels/rsa.jsx"></script>
+<script type="text/babel" src="js/panels/dh.jsx"></script>
+<script type="text/babel" src="js/panels/hash.jsx"></script>
+<script type="text/babel" src="js/panels/file.jsx"></script>
+
+<!-- 主应用（依赖所有面板） -->
+<script type="text/babel" src="js/app.jsx"></script>
+</body>
+</html>

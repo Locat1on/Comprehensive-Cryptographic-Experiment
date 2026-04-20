@@ -1,0 +1,26 @@
+# IDE/编辑器
+.claude/
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 编译产物
+backend/server.exe
+backend/*.o
+backend/crypto/*.o
+backend/lib/*.a
+
+# 日志文件
+*.log
+
+# 临时文件
+*.tmp
+*.temp
+.DS_Store
+Thumbs.db
+
+# 依赖目录（如有）
+node_modules/
+vendor/
