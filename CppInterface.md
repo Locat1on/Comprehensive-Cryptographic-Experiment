@@ -1,6 +1,47 @@
 # Cryptology — C++ Backend Interface Reference
 
-后端框架：**Crow** (HTTP) | 算法库：自建，无第三方依赖
+后端框架：**Crow** (HTTP) | 算法库：自建 | 依赖：**ASIO** (header-only)
+
+---
+
+## 构建说明
+
+### 环境要求
+
+| 组件 | 要求 | 说明 |
+|------|------|------|
+| 编译器 | g++ ≥ 11 或 clang++ ≥ 12 | 需支持 C++17 |
+| ASIO | ≥ 1.30 | header-only，无需编译 |
+| 平台 | Windows (PowerShell) | 当前仅支持 Windows |
+
+### 快速构建
+
+```powershell
+cd backend
+.\build.ps1
+```
+
+### 编译器配置
+
+脚本自动检测以下路径（按优先级）：
+1. 环境变量 `$env:GXX` / `$env:AR`
+2. PATH 中的 `g++` / `ar`
+3. 常见安装路径（MSYS2、MinGW-w64）
+
+```powershell
+# 手动指定编译器
+$env:GXX = "C:\msys64\mingw64\bin\g++.exe"
+$env:AR = "C:\msys64\mingw64\bin\ar.exe"
+.\build.ps1
+```
+
+### ASIO 配置
+
+```powershell
+# 如果 ASIO 不在标准路径
+$env:ASIO_ROOT = "C:\asio-1.30.2\include"
+.\build.ps1
+```
 
 ---
 
@@ -222,28 +263,47 @@ public:
 ## 8. SecureFileTransfer.h
 
 ```cpp
+// Forward declaration — avoid pulling in crow_all.h here
+namespace crow {
+    template<typename... Middlewares>
+    class Crow;
+    using SimpleApp = Crow<>;
+}
+
 class SecureFileTransfer {
 public:
     struct Config {
-        std::string cipher   = "AES-256-CTR";
-        size_t      chunkSize = 4 * 1024 * 1024;  // 4 MB
+        std::string cipher    = "AES-256-CTR";
+        size_t      chunkSize = 4 * 1024 * 1024;
         Hash::Algo  hashAlgo  = Hash::SHA1;
     };
 
-    // 发送端 (Client)
-    bool sendFile(const std::string& localPath,
-                  const std::string& serverAddr,
-                  const BigInt128&   sharedKey,   // 来自 DHProtocol
-                  const Config&      cfg = {});
+    struct UploadResult {
+        std::string id;
+        int         chunks;
+        std::string hash;
+    };
 
-    // 接收端 (Server, Crow 路由注册)
-    void registerRoutes(crow::SimpleApp& app);
+    struct Status {
+        std::string id;
+        int         progress;   // 0–100
+        std::string status;     // "pending" | "transferring" | "done" | "error"
+    };
 
-    // 完整性: HMAC-SHA1 每分片校验
-    // 来源:   RSA 签名原始文件摘要
-    // 续传:   ETag / Range 支持
+    // 服务端：接收原始文件数据，返回任务 ID
+    UploadResult receiveAndEncrypt(const std::string& fileData,
+                                   const std::string& cipher,
+                                   const Config& cfg);
+
+    // 服务端：查询传输状态
+    Status getStatus(const std::string& id);
+
+    // 服务端：返回加密后文件数据
+    std::string getFile(const std::string& id);
 };
 ```
+
+**注意：** `crow::SimpleApp` 是模板类 `Crow<>` 的别名，前向声明需使用模板语法。
 
 **传输流程**
 ```
@@ -254,4 +314,120 @@ public:
 5. 每片附 HMAC-SHA1, POST /file/encrypt-upload
 6. 接收端逐片验证 HMAC, 解密, 重组
 7. 验证 RSA_Verify(S, H') 确认来源
+```
+
+---
+
+## 添加新模块指南
+
+### 1. 创建头文件
+
+在 `backend/crypto/include/` 创建 `YourModule.h`：
+
+```cpp
+#pragma once
+#include <string>
+
+class YourModule {
+public:
+    struct Config {
+        // 默认配置参数
+    };
+    
+    struct Result {
+        // 返回结果结构
+    };
+    
+    // 构造函数
+    explicit YourModule(const Config& cfg);
+    
+    // 主要方法
+    Result process(const std::string& input);
+    
+private:
+    // 内部辅助方法
+    void helper();
+};
+```
+
+### 2. 创建实现文件
+
+在 `backend/crypto/src/` 创建 `YourModule.cpp`：
+
+```cpp
+#include "YourModule.h"
+#include <stdexcept>
+
+YourModule::YourModule(const Config& cfg) {
+    // TODO: 初始化
+}
+
+YourModule::Result YourModule::process(const std::string& input) {
+    // TODO: 实现算法
+    throw std::runtime_error("NOT_IMPLEMENTED");
+}
+```
+
+### 3. 添加 HTTP 路由
+
+在 `backend/src/main.cpp` 中添加：
+
+```cpp
+#include "YourModule.h"
+
+// 在 main() 中添加路由
+CROW_ROUTE(app, "/api/v1/yourmodule/action")
+.methods("POST"_method)
+([](const crow::request& req) {
+    auto body = crow::json::load(req.body);
+    if (!body) return err(400, "invalid JSON");
+    
+    // 解析参数
+    std::string input = body["input"].s();
+    
+    // 调用算法
+    YourModule::Config cfg;
+    YourModule module(cfg);
+    auto result = module.process(input);
+    
+    // 返回结果
+    return ok(crow::json::wvalue{
+        {"output", result.output}
+    });
+});
+```
+
+### 4. 更新构建脚本
+
+在 `backend/build.ps1` 的 `$sourceFiles` 数组中添加：
+
+```powershell
+@{ src = "crypto\src\YourModule.cpp"; obj = "crypto\YourModule.o" },
+```
+
+### 5. 前端集成
+
+在 `frontend/js/panels/` 创建 `yourmodule.jsx`，参考现有面板实现。
+
+### 接口设计规范
+
+| 项目 | 规范 |
+|------|------|
+| 类名 | PascalCase，如 `AESCipher` |
+| 方法名 | camelCase，如 `encryptBlock` |
+| 参数 | 使用 `const std::string&` 传递大字符串 |
+| 返回值 | 复杂结果使用结构体，简单值直接返回 |
+| 错误处理 | 抛出 `std::runtime_error`，描述错误原因 |
+| 默认参数 | 使用 `Config` 结构体封装，避免过长参数列表 |
+
+### 前向声明 Crow 类型
+
+如果需要在头文件中使用 Crow 类型但不包含 `crow_all.h`：
+
+```cpp
+namespace crow {
+    template<typename... Middlewares>
+    class Crow;
+    using SimpleApp = Crow<>;
+}
 ```
