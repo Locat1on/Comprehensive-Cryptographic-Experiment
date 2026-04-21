@@ -45,9 +45,9 @@ function FileDropZone({ label = 'XML / KEY FILE', accept = '.xml,.key,.txt', onF
   return (
     <div
       className={`file-zone${fileName ? ' has-file' : ''}`}
-      onClick={() => ref.current.click()}
+      onClick={() => { ref.current.value = ''; ref.current.click(); }}
       onDragOver={e => e.preventDefault()}
-      onDrop={e => { e.preventDefault(); handle(e.dataTransfer.files[0]); }}>
+      onDrop={e => { e.preventDefault(); ref.current.value = ''; handle(e.dataTransfer.files[0]); }}>
       <input ref={ref} type="file" accept={accept} style={{ display: 'none' }}
         onChange={e => handle(e.target.files[0])} />
       <div style={{ width: 28, height: 28, margin: '0 auto 6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -59,6 +59,14 @@ function FileDropZone({ label = 'XML / KEY FILE', accept = '.xml,.key,.txt', onF
         {fileName || label}
       </div>
       {!fileName && <div style={{ fontSize: 12, color: 'rgba(0,0,0,0.5)', marginTop: 4 }}>点击或拖拽上传</div>}
+      {fileName && (
+        <button
+          className="btn btn-sm btn-outline"
+          style={{ marginTop: 8 }}
+          onClick={e => { e.stopPropagation(); setFileName(null); }}>
+          重新上传
+        </button>
+      )}
     </div>
   );
 }

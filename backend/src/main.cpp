@@ -2,6 +2,7 @@
 #include "crow_all.h"
 #include <fstream>
 #include <sstream>
+#include <iomanip>
 #include <unordered_map>
 
 #include "AffineCipher.h"
@@ -63,6 +64,31 @@ static crow::response ok(crow::json::wvalue body) {
     res.set_header("Content-Type", "application/json");
     set_cors(res);
     return res;
+}
+
+// ── HEX / bytes 转换工具 ──────────────────────────────────
+static std::vector<uint8_t> hex_to_bytes(const std::string& hex) {
+    std::vector<uint8_t> out;
+    std::istringstream iss(hex);
+    std::string token;
+    while (iss >> token) {
+        if (token.empty()) continue;
+        out.push_back(static_cast<uint8_t>(std::stoul(token, nullptr, 16)));
+    }
+    return out;
+}
+
+static std::string bytes_to_hex(const std::vector<uint8_t>& bytes) {
+    std::ostringstream oss;
+    for (size_t i = 0; i < bytes.size(); i++) {
+        if (i > 0) oss << ' ';
+        oss << std::uppercase << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(bytes[i]);
+    }
+    return oss.str();
+}
+
+static std::vector<uint8_t> string_to_bytes(const std::string& s) {
+    return std::vector<uint8_t>(s.begin(), s.end());
 }
 
 int main() {
@@ -157,10 +183,19 @@ int main() {
         std::string seed      = body["seed"].s();
         std::string plaintext = body["plaintext"].s();
 
-        // TODO: StreamCipher sc(seed_bytes, StreamCipher::RC4);
-        //       auto cipher = sc.encrypt(plaintext_bytes);
-        //       return ok({{"ciphertext", hex_str}, {"keystream", ks_str}});
-        return ok(crow::json::wvalue{{"ciphertext", "NOT_IMPLEMENTED"}, {"keystream", "NOT_IMPLEMENTED"}});
+        auto seed_bytes      = hex_to_bytes(seed);
+        auto plaintext_bytes = string_to_bytes(plaintext);
+
+        if (seed_bytes.empty()) return err(400, "invalid seed");
+
+        StreamCipher sc(seed_bytes, StreamCipher::RC4);
+        auto cipher = sc.encrypt(plaintext_bytes);
+        auto ks     = sc.keystream(plaintext_bytes.size());
+
+        return ok(crow::json::wvalue{
+            {"ciphertext", bytes_to_hex(cipher)},
+            {"keystream",  bytes_to_hex(ks)}
+        });
     });
 
     CROW_ROUTE(app, "/api/v1/stream/lfsr")
@@ -172,8 +207,19 @@ int main() {
         std::string seed      = body["seed"].s();
         std::string plaintext = body["plaintext"].s();
 
-        // TODO: StreamCipher sc(seed_bytes, StreamCipher::LFSR_JK);
-        return ok(crow::json::wvalue{{"ciphertext", "NOT_IMPLEMENTED"}, {"keystream", "NOT_IMPLEMENTED"}});
+        auto seed_bytes      = hex_to_bytes(seed);
+        auto plaintext_bytes = string_to_bytes(plaintext);
+
+        if (seed_bytes.empty()) return err(400, "invalid seed");
+
+        StreamCipher sc(seed_bytes, StreamCipher::LFSR_JK);
+        auto cipher = sc.encrypt(plaintext_bytes);
+        auto ks     = sc.keystream(plaintext_bytes.size());
+
+        return ok(crow::json::wvalue{
+            {"ciphertext", bytes_to_hex(cipher)},
+            {"keystream",  bytes_to_hex(ks)}
+        });
     });
 
     // ── 4. DES ────────────────────────────────────────────
