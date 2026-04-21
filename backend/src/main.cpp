@@ -183,15 +183,38 @@ int main() {
         auto body = crow::json::load(req.body);
         if (!body) return err(400, "invalid JSON");
 
-        std::string data = body["data"].s();   // HEX string
-        std::string key  = body["key"].s();    // 16 HEX chars
-        std::string mode = body["mode"].s();   // "ECB" or "CBC"
+        std::string dataHex = body["data"].s();
+        std::string keyHex = body["key"].s();
+        std::string modeStr = body["mode"].s();
 
-        // TODO: uint64_t k = std::stoull(key, nullptr, 16);
-        //       DES des(k);
-        //       auto result = des.encrypt(data_bytes, mode == "CBC" ? DES::CBC : DES::ECB);
-        //       return ok({{"result", to_hex(result)}});
-        return ok(crow::json::wvalue{{"result", "NOT_IMPLEMENTED"}});
+        try {
+            uint64_t key = std::stoull(keyHex, nullptr, 16);
+            DES des(key);
+
+            std::string dataStr;
+            for (size_t i = 0; i < dataHex.length(); i += 2) {
+                dataStr += static_cast<char>(std::stoi(dataHex.substr(i, 2), nullptr, 16));
+            }
+            std::vector<uint8_t> dataVec(dataStr.begin(), dataStr.end());
+
+            DES::Mode mode = (modeStr == "CBC") ? DES::CBC : DES::ECB;
+            uint64_t iv = 0;
+            if (mode == DES::CBC && body.has("iv")) {
+                iv = std::stoull(body["iv"].s(), nullptr, 16);
+            }
+
+            auto encrypted = des.encrypt(dataVec, mode, iv);
+            std::string resultHex;
+            for (uint8_t byte : encrypted) {
+                char buf[3];
+                snprintf(buf, sizeof(buf), "%02X", byte);
+                resultHex += buf;
+            }
+
+            return ok(crow::json::wvalue{{"result", resultHex}});
+        } catch (const std::exception& ex) {
+            return err(400, ex.what());
+        }
     });
 
     CROW_ROUTE(app, "/api/v1/des/decrypt")
@@ -200,12 +223,38 @@ int main() {
         auto body = crow::json::load(req.body);
         if (!body) return err(400, "invalid JSON");
 
-        std::string data = body["data"].s();
-        std::string key  = body["key"].s();
-        std::string mode = body["mode"].s();
+        std::string dataHex = body["data"].s();
+        std::string keyHex = body["key"].s();
+        std::string modeStr = body["mode"].s();
 
-        // TODO: DES des(k); auto result = des.decrypt(...);
-        return ok(crow::json::wvalue{{"result", "NOT_IMPLEMENTED"}});
+        try {
+            uint64_t key = std::stoull(keyHex, nullptr, 16);
+            DES des(key);
+
+            std::string dataStr;
+            for (size_t i = 0; i < dataHex.length(); i += 2) {
+                dataStr += static_cast<char>(std::stoi(dataHex.substr(i, 2), nullptr, 16));
+            }
+            std::vector<uint8_t> dataVec(dataStr.begin(), dataStr.end());
+
+            DES::Mode mode = (modeStr == "CBC") ? DES::CBC : DES::ECB;
+            uint64_t iv = 0;
+            if (mode == DES::CBC && body.has("iv")) {
+                iv = std::stoull(body["iv"].s(), nullptr, 16);
+            }
+
+            auto decrypted = des.decrypt(dataVec, mode, iv);
+            std::string resultHex;
+            for (uint8_t byte : decrypted) {
+                char buf[3];
+                snprintf(buf, sizeof(buf), "%02X", byte);
+                resultHex += buf;
+            }
+
+            return ok(crow::json::wvalue{{"result", resultHex}});
+        } catch (const std::exception& ex) {
+            return err(400, ex.what());
+        }
     });
 
     // ── 5. RSA ────────────────────────────────────────────
