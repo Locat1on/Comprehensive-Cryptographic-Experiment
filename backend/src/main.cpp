@@ -88,11 +88,15 @@ int main() {
         int a = body["a"].i();
         int b = body["b"].i();
 
-        // TODO: AffineCipher cipher(a, b); return ok({{"ciphertext", cipher.encrypt(plaintext)}, ...});
-        return ok(crow::json::wvalue{
-            {"ciphertext", "NOT_IMPLEMENTED"},
-            {"key", crow::json::wvalue{{"a", a}, {"b", b}}}
-        });
+        try {
+            AffineCipher cipher(a, b);
+            return ok(crow::json::wvalue{
+                {"ciphertext", cipher.encrypt(plaintext)},
+                {"key", crow::json::wvalue{{"a", a}, {"b", b}}}
+            });
+        } catch (const std::exception& ex) {
+            return err(400, ex.what());
+        }
     });
 
     CROW_ROUTE(app, "/api/v1/affine/decrypt")
@@ -105,8 +109,12 @@ int main() {
         int a = body["a"].i();
         int b = body["b"].i();
 
-        // TODO: AffineCipher cipher(a, b); return ok({{"plaintext", cipher.decrypt(ciphertext)}});
-        return ok(crow::json::wvalue{{"plaintext", "NOT_IMPLEMENTED"}});
+        try {
+            AffineCipher cipher(a, b);
+            return ok(crow::json::wvalue{{"plaintext", cipher.decrypt(ciphertext)}});
+        } catch (const std::exception& ex) {
+            return err(400, ex.what());
+        }
     });
 
     // ── 2. 大整数运算 ─────────────────────────────────────
@@ -120,8 +128,23 @@ int main() {
         std::string b  = body["b"].s();
         std::string op = body["op"].s();
 
-        // TODO: BigInt128 ba(a), bb(b); auto r = ...; return ok({{"result", r.toDec()}, {"hex", r.toHex()}});
-        return ok(crow::json::wvalue{{"result", "NOT_IMPLEMENTED"}, {"hex", "NOT_IMPLEMENTED"}});
+        try {
+            BigInt128 ba(a), bb(b);
+            if (op == "+") {
+                BigInt128 r = ba + bb;
+                return ok(crow::json::wvalue{{"result", r.toDec()}, {"hex", r.toHex()}});
+            } else if (op == "-") {
+                BigInt128 r = ba - bb;
+                return ok(crow::json::wvalue{{"result", r.toDec()}, {"hex", r.toHex()}});
+            } else if (op == "*") {
+                BigInt256 r = ba * bb;
+                return ok(crow::json::wvalue{{"result", r.toDec()}, {"hex", r.toHex()}});
+            } else {
+                return err(400, "unknown op: " + op);
+            }
+        } catch (const std::exception& ex) {
+            return err(400, ex.what());
+        }
     });
 
     // ── 3. 流密码 ─────────────────────────────────────────
@@ -196,9 +219,18 @@ int main() {
         int q = body["q"].i();
         int e = body["e"].i();
 
-        // TODO: auto kp = RSA::generate(p, q, e);
-        //       return ok({{"n", kp.n.toDec()}, {"e", kp.e.toDec()}, {"d", kp.d.toDec()}});
-        return ok(crow::json::wvalue{{"n", 0}, {"e", 0}, {"d", 0}, {"phi", 0}});
+        try {
+            auto kp = RSA::generate((uint16_t)p, (uint16_t)q, (uint16_t)e);
+            int64_t phi = (int64_t)((p - 1) * (q - 1));
+            return ok(crow::json::wvalue{
+                {"n",   (int64_t)std::stoull(kp.n.toDec())},
+                {"e",   (int64_t)std::stoull(kp.e.toDec())},
+                {"d",   (int64_t)std::stoull(kp.d.toDec())},
+                {"phi", phi}
+            });
+        } catch (const std::exception& ex) {
+            return err(400, ex.what());
+        }
     });
 
     CROW_ROUTE(app, "/api/v1/rsa/encrypt")
@@ -207,8 +239,28 @@ int main() {
         auto body = crow::json::load(req.body);
         if (!body) return err(400, "invalid JSON");
 
-        // TODO: RSA rsa(key_pair); auto blocks = rsa.encrypt(message); return ok({{"blocks", ...}});
-        return ok(crow::json::wvalue{{"blocks", crow::json::wvalue::list{}}});
+        try {
+            std::string message = body["message"].s();
+            int64_t n_val = body["key"]["n"].i();
+            int64_t e_val = body["key"]["e"].i();
+
+            RSA::KeyPair kp;
+            kp.n = BigInt128(0ULL, (uint64_t)n_val);
+            kp.e = BigInt128(0ULL, (uint64_t)e_val);
+            kp.d = BigInt128(0ULL, 0ULL);
+
+            RSA rsa(kp);
+            auto blocks = rsa.encrypt(message);
+
+            crow::json::wvalue::list block_list;
+            block_list.reserve(blocks.size());
+            for (const auto& b : blocks)
+                block_list.emplace_back((int64_t)std::stoull(b.toDec()));
+
+            return ok(crow::json::wvalue{{"blocks", std::move(block_list)}});
+        } catch (const std::exception& ex) {
+            return err(400, ex.what());
+        }
     });
 
     CROW_ROUTE(app, "/api/v1/rsa/decrypt")
@@ -217,8 +269,26 @@ int main() {
         auto body = crow::json::load(req.body);
         if (!body) return err(400, "invalid JSON");
 
-        // TODO: RSA rsa(key_pair); return ok({{"message", rsa.decrypt(blocks)}});
-        return ok(crow::json::wvalue{{"message", "NOT_IMPLEMENTED"}});
+        try {
+            int64_t n_val = body["key"]["n"].i();
+            int64_t d_val = body["key"]["d"].i();
+
+            RSA::KeyPair kp;
+            kp.n = BigInt128(0ULL, (uint64_t)n_val);
+            kp.e = BigInt128(0ULL, 0ULL);
+            kp.d = BigInt128(0ULL, (uint64_t)d_val);
+
+            auto blocks_json = body["blocks"];
+            std::vector<BigInt128> blocks;
+            blocks.reserve(blocks_json.size());
+            for (size_t i = 0; i < blocks_json.size(); i++)
+                blocks.emplace_back(BigInt128(0ULL, (uint64_t)blocks_json[i].i()));
+
+            RSA rsa(kp);
+            return ok(crow::json::wvalue{{"message", rsa.decrypt(blocks)}});
+        } catch (const std::exception& ex) {
+            return err(400, ex.what());
+        }
     });
 
     // ── 6. D-H 协议 ───────────────────────────────────────
@@ -373,7 +443,7 @@ int main() {
     });
 
     // ── 启动 ─────────────────────────────────────────────
-    CROW_LOG_INFO << "Frontend: http://localhost:8080/";
-    app.port(8080).multithreaded().run();
+    CROW_LOG_INFO << "Frontend: http://localhost:8888/";
+    app.port(8888).multithreaded().run();
     return 0;
 }

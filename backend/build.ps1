@@ -11,6 +11,17 @@ function Resolve-Tool([string]$envName, [string]$defaultCommand) {
         return $cmd.Source
     }
 
+    # Fallback: 常见 MinGW 安装路径
+    $candidates = @(
+        "D:\CodeBlocks\MinGW\bin\$defaultCommand.exe",
+        "C:\msys64\mingw64\bin\$defaultCommand.exe",
+        "F:\msys2\mingw64\bin\$defaultCommand.exe",
+        "C:\Program Files (x86)\Dev-Cpp\MinGW64\bin\$defaultCommand.exe"
+    )
+    foreach ($c in $candidates) {
+        if (Test-Path $c) { return $c }
+    }
+
     return $null
 }
 
@@ -54,7 +65,12 @@ $gxx = Resolve-Tool "GXX" "g++"
 $ar = Resolve-Tool "AR" "ar"
 $asioInclude = Resolve-IncludeRoot "ASIO_ROOT" @(
     "C:\msys64\mingw64\include",
-    "F:\msys2\mingw64\include"
+    "F:\msys2\mingw64\include",
+    "D:\msys64\mingw64\include",
+    "D:\msys2\mingw64\include",
+    "$PSScriptRoot\lib\asio",
+    "$PSScriptRoot\lib\asio\include",
+    "$PSScriptRoot\lib"
 ) "asio.hpp"
 
 if (-not $gxx) {

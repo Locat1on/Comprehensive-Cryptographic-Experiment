@@ -25,3 +25,14 @@ Thumbs.db
 # 依赖目录（如有）
 node_modules/
 vendor/
+
+# MinGW 运行时 DLL（各自从本地 MinGW 复制）
+backend/*.dll
+
+# ASIO 下载/解压临时文件
+backend/asio.zip
+backend/lib/asio_extracted/
+
+# 服务器输出日志
+backend/server_out.txt
+backend/server_err.txt
