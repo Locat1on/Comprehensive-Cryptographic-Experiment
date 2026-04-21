@@ -2,6 +2,7 @@
 #include <vector>
 #include <cstdint>
 #include <string>
+#include <algorithm>
 
 class StreamCipher {
 public:
@@ -20,6 +21,8 @@ private:
     uint8_t S_[256];
     int i_, j_;
 
+    uint8_t prga();
+    uint8_t lfsrStep();
     void initRC4();
     void initLFSR();
 };
