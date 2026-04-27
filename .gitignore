@@ -15,6 +15,7 @@ backend/lib/*.a
 
 # 日志文件
 *.log
+backend/transfers/
 
 # 临时文件
 *.tmp

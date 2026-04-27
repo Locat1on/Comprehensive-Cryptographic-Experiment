@@ -10,26 +10,47 @@ function DHProtocol({ apiShow }) {
     setLog(l => [...l, { t: timestamp(), msg, color }]);
   }
 
+  function modPow(base, exp, mod) {
+    let b = BigInt(base) % BigInt(mod);
+    let e = BigInt(exp);
+    const m = BigInt(mod);
+    let r = 1n;
+    while (e > 0n) {
+      if (e & 1n) r = (r * b) % m;
+      b = (b * b) % m;
+      e >>= 1n;
+    }
+    return r;
+  }
+
   async function startExchange() {
     setLoading(true);
     setLog([]);
     setState(null);
-    addLog(`协议初始化: p=${p}, g=${g}`);
     try {
-      const init = await apiCall('/dh/init', { p, g });
-      addLog(`服务端公钥 B = ${init.pubKey}`, '#5b57d1');
-      setState(s => ({ ...s, ...init, step: 1 }));
-      addLog('客户端公钥 A 已发送至服务端');
+      const pBig = BigInt(p);
+      const gBig = BigInt(g);
+      const clientPrivate = BigInt(2 + Math.floor(Math.random() * Math.max(2, Number(pBig - 3n))));
+      const clientPub = modPow(gBig, clientPrivate, pBig).toString();
+      const nonce = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
-      const exch = await apiCall('/dh/exchange', { pubKey: init.pubKey, p, g });
-      addLog(`共享密钥 K = ${exch.sharedKey}`, '#00944a');
-      setState(s => ({ ...s, ...exch, step: 2 }));
+      addLog(`Client: p=${p}, g=${g}, A=${clientPub}`);
+      const init = await apiCall('/dh/init', { p, g, pubKey: clientPub, nonce });
+      addLog(`Server: B=${init.pubKey}`);
+      addLog(`Server signature: ${init.signature}`, '#5b57d1');
+      setState({ ...init, clientPub, step: 1 });
 
-      const verify = await apiCall('/dh/verify', { signature: init.signature ?? '', hash: exch.sharedKey ?? '' });
-      addLog(verify.ok ? '✓ 签名验证通过，密钥协商成功！' : '✗ 签名验证失败', verify.ok ? '#00944a' : '#c54000');
+      const exch = await apiCall('/dh/exchange', { sessionId: init.sessionId });
+      const clientShared = modPow(BigInt(init.pubKey), clientPrivate, pBig).toString();
+      addLog(`Client shared K=${clientShared}`);
+      addLog(`Server shared K=${exch.sharedKey}`, '#00944a');
+      setState(s => ({ ...s, ...exch, clientShared, step: 2 }));
+
+      const verify = await apiCall('/dh/verify', { message: init.message, signature: init.signature });
+      addLog(verify.ok ? 'RSA signature verified: source and integrity OK' : 'RSA signature verification failed', verify.ok ? '#00944a' : '#c54000');
       setState(s => ({ ...s, verified: verify.ok, step: 3 }));
     } catch (e) {
-      addLog(`错误: ${e.message}`, '#c54000');
+      addLog(`Error: ${e.message}`, '#c54000');
     } finally {
       setLoading(false);
     }
@@ -37,8 +58,8 @@ function DHProtocol({ apiShow }) {
 
   return (
     <div className="col">
-      <SectionHeader title="D-H 密钥交换协议" badge="Key Exchange + Authentication"
-        subtitle="基于 Diffie-Hellman 的双实体认证协议 — C/S 模式，含消息完整性与来源验证" />
+      <SectionHeader title="D-H 认证协议" badge="C/S Authenticated Key Exchange"
+        subtitle="Client/Server 两个实体通过 D-H 协商共享密钥，服务端用 RSA 签名握手消息，SHA-1 验证完整性" />
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
         <div className="col">
           <div className="grid-2">
@@ -46,11 +67,11 @@ function DHProtocol({ apiShow }) {
             <div><MonoLabel>生成元 g</MonoLabel><input className="inp" value={g} onChange={e => setG(e.target.value)} type="number" /></div>
           </div>
           <button className="btn btn-accent" onClick={startExchange} disabled={loading} style={{ justifyContent: 'center' }}>
-            {loading ? '协商中...' : '▶  开始密钥交换'}
+            {loading ? '协商中...' : '开始 D-H 认证协商'}
           </button>
           {state && (
             <div className="result-appear" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              {['初始化', '公钥交换', '共享密钥', '验证'].map((label, i) => (
+              {['初始化', '密钥协商', '签名验证'].map((label, i) => (
                 <div key={i} className="status" style={{
                   background: i < (state.step ?? 0) ? 'rgba(0,200,100,0.08)' : 'transparent',
                   borderColor: i < (state.step ?? 0) ? 'rgba(0,200,100,0.2)' : 'var(--border-light)',
@@ -70,7 +91,7 @@ function DHProtocol({ apiShow }) {
           )}
         </div>
         <div className="col">
-          <div style={{ background: 'rgba(1,1,32,0.04)', border: '1px solid var(--border-light)', borderRadius: 'var(--r-md)', padding: 16, flex: 1, overflow: 'auto', maxHeight: 260 }}>
+          <div style={{ background: 'rgba(1,1,32,0.04)', border: '1px solid var(--border-light)', borderRadius: 'var(--r-md)', padding: 16, flex: 1, overflow: 'auto', maxHeight: 300 }}>
             <MonoLabel>通信日志</MonoLabel>
             <div style={{ fontFamily: 'var(--mono)', fontSize: 12, lineHeight: 1.8, marginTop: 6 }}>
               {log.length === 0 && <div style={{ color: 'rgba(0,0,0,0.5)' }}>等待协议启动...</div>}
@@ -84,7 +105,7 @@ function DHProtocol({ apiShow }) {
           {state?.verified !== undefined && (
             <div className={`status result-appear ${state.verified ? 'ok' : 'warn'}`}>
               <span className="dot" />
-              {state.verified ? '密钥协商成功 — 签名验证通过' : '签名验证失败'}
+              {state.verified ? '密钥协商成功，来源与完整性验证通过' : '签名验证失败'}
             </div>
           )}
         </div>

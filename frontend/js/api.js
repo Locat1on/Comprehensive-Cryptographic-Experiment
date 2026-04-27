@@ -10,7 +10,7 @@ async function apiCall(path, body = {}) {
       body: JSON.stringify(body),
     });
   } catch {
-    throw new Error('⚠ 后端未连接 — 请先启动 server.exe (localhost:8080)');
+    throw new Error('⚠ 后端未连接 — 请先启动 server.exe (localhost:8888)');
   }
   if (!res.ok) {
     const text = await res.text().catch(() => '');
@@ -24,7 +24,7 @@ async function apiGet(path) {
   try {
     res = await fetch(`${API_BASE}${path}`);
   } catch {
-    throw new Error('⚠ 后端未连接 — 请先启动 server.exe (localhost:8080)');
+    throw new Error('⚠ 后端未连接 — 请先启动 server.exe (localhost:8888)');
   }
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
@@ -35,8 +35,26 @@ async function apiUpload(path, formData) {
   try {
     res = await fetch(`${API_BASE}${path}`, { method: 'POST', body: formData });
   } catch {
-    throw new Error('⚠ 后端未连接 — 请先启动 server.exe (localhost:8080)');
+    throw new Error('⚠ 后端未连接 — 请先启动 server.exe (localhost:8888)');
   }
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+async function apiUploadRaw(path, blob) {
+  let res;
+  try {
+    res = await fetch(`${API_BASE}${path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/octet-stream' },
+      body: blob,
+    });
+  } catch {
+    throw new Error('后端未连接，请先启动 server.exe (localhost:8888)');
+  }
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`HTTP ${res.status}${text ? ': ' + text : ''}`);
+  }
   return res.json();
 }

@@ -4,6 +4,11 @@
 #include <sstream>
 #include <iomanip>
 #include <unordered_map>
+#include <algorithm>
+#include <cctype>
+#include <mutex>
+#include <random>
+#include <ctime>
 
 #include "AffineCipher.h"
 #include "BigInt128.h"
@@ -89,6 +94,57 @@ static std::string bytes_to_hex(const std::vector<uint8_t>& bytes) {
 
 static std::vector<uint8_t> string_to_bytes(const std::string& s) {
     return std::vector<uint8_t>(s.begin(), s.end());
+}
+
+static Hash::Algo parse_hash_algo(const std::string& algo) {
+    return algo == "MD5" ? Hash::MD5 : Hash::SHA1;
+}
+
+static RSA::KeyPair demo_signing_key() {
+    return RSA::generate(61, 53, 17);
+}
+
+static BigInt128 digest_to_bigint(const std::string& digest) {
+    std::string h;
+    for (unsigned char c : digest) {
+        if (!std::isspace(c)) h.push_back(static_cast<char>(std::toupper(c)));
+    }
+    if (h.size() > 32) h = h.substr(h.size() - 32);
+    return BigInt128::fromHex(h);
+}
+
+static uint64_t mod_pow_u64(uint64_t base, uint64_t exp, uint64_t mod) {
+    uint64_t result = 1 % mod;
+    base %= mod;
+    while (exp > 0) {
+        if (exp & 1ULL) result = static_cast<uint64_t>((unsigned __int128)result * base % mod);
+        base = static_cast<uint64_t>((unsigned __int128)base * base % mod);
+        exp >>= 1U;
+    }
+    return result;
+}
+
+struct DHServerSession {
+    uint64_t p = 0;
+    uint64_t g = 0;
+    uint64_t clientPub = 0;
+    uint64_t serverPriv = 0;
+    uint64_t serverPub = 0;
+    std::string nonce;
+    std::string message;
+    std::string signature;
+};
+
+static std::mutex g_dh_mutex;
+static std::unordered_map<std::string, DHServerSession> g_dh_sessions;
+
+static std::string make_session_id(const std::string& prefix) {
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_int_distribution<uint32_t> dist;
+    std::ostringstream oss;
+    oss << prefix << std::hex << std::time(nullptr) << "_" << dist(gen);
+    return oss.str();
 }
 
 int main() {
@@ -393,15 +449,55 @@ int main() {
         auto body = crow::json::load(req.body);
         if (!body) return err(400, "invalid JSON");
 
-        std::string p      = body["p"].s();
-        std::string g      = body["g"].s();
-        std::string pubKey = body["pubKey"].s();
-        std::string nonce  = body["nonce"].s();
+        try {
+            uint64_t p = std::stoull(std::string(body["p"].s()));
+            uint64_t g = std::stoull(std::string(body["g"].s()));
+            uint64_t clientPub = body.has("pubKey") ? std::stoull(std::string(body["pubKey"].s())) : 0;
+            std::string nonce = body.has("nonce") ? std::string(body["nonce"].s()) : make_session_id("nonce_");
 
-        // TODO: DHProtocol dh(BigInt128(p), BigInt128(g));
-        //       auto serverPub = dh.generatePublicKey();
-        //       return ok({{"pubKey", serverPub.toDec()}, {"signature", "..."}});
-        return ok(crow::json::wvalue{{"pubKey", "NOT_IMPLEMENTED"}, {"signature", "NOT_IMPLEMENTED"}});
+            if (p < 5 || g < 2 || g >= p) return err(400, "invalid DH parameters");
+            if (clientPub <= 1 || clientPub >= p) return err(400, "invalid client public key");
+
+            std::random_device rd;
+            std::mt19937_64 gen(rd());
+            std::uniform_int_distribution<uint64_t> dist(2, p - 2);
+
+            DHServerSession session;
+            session.p = p;
+            session.g = g;
+            session.clientPub = clientPub;
+            session.serverPriv = dist(gen);
+            session.serverPub = mod_pow_u64(g, session.serverPriv, p);
+            session.nonce = nonce;
+            session.message = "DH|p=" + std::to_string(p) +
+                              "|g=" + std::to_string(g) +
+                              "|client=" + std::to_string(clientPub) +
+                              "|server=" + std::to_string(session.serverPub) +
+                              "|nonce=" + nonce;
+
+            const std::string digest = Hash::compute(session.message, Hash::SHA1);
+            RSA signer(demo_signing_key());
+            session.signature = signer.sign(digest_to_bigint(digest)).toHex();
+            std::string sessionId = make_session_id("dh_");
+
+            {
+                std::lock_guard<std::mutex> lock(g_dh_mutex);
+                g_dh_sessions[sessionId] = session;
+            }
+
+            auto kp = demo_signing_key();
+            return ok(crow::json::wvalue{
+                {"sessionId", sessionId},
+                {"pubKey", std::to_string(session.serverPub)},
+                {"nonce", nonce},
+                {"message", session.message},
+                {"hash", digest},
+                {"signature", session.signature},
+                {"rsaPublic", crow::json::wvalue{{"n", kp.n.toDec()}, {"e", kp.e.toDec()}}}
+            });
+        } catch (const std::exception& ex) {
+            return err(400, ex.what());
+        }
     });
 
     CROW_ROUTE(app, "/api/v1/dh/exchange")
@@ -410,8 +506,21 @@ int main() {
         auto body = crow::json::load(req.body);
         if (!body) return err(400, "invalid JSON");
 
-        // TODO: auto shared = dh.computeSharedKey(peerPublic);
-        return ok(crow::json::wvalue{{"sharedKey", "NOT_IMPLEMENTED"}});
+        try {
+            std::string sessionId = body.has("sessionId") ? std::string(body["sessionId"].s()) : "";
+            DHServerSession session;
+            {
+                std::lock_guard<std::mutex> lock(g_dh_mutex);
+                auto it = g_dh_sessions.find(sessionId);
+                if (it == g_dh_sessions.end()) return err(404, "unknown DH session");
+                session = it->second;
+            }
+            uint64_t shared = mod_pow_u64(session.clientPub, session.serverPriv, session.p);
+            std::string fp = Hash::compute(std::to_string(shared), Hash::SHA1).substr(0, 16);
+            return ok(crow::json::wvalue{{"sharedKey", std::to_string(shared)}, {"fingerprint", fp}});
+        } catch (const std::exception& ex) {
+            return err(400, ex.what());
+        }
     });
 
     CROW_ROUTE(app, "/api/v1/dh/verify")
@@ -420,8 +529,19 @@ int main() {
         auto body = crow::json::load(req.body);
         if (!body) return err(400, "invalid JSON");
 
-        // TODO: bool ok = dh.verifyPeer(signedMsg, peerPubKey);
-        return ok(crow::json::wvalue{{"ok", false}});
+        try {
+            std::string message = body.has("message") ? std::string(body["message"].s()) : "";
+            std::string signature = body.has("signature") ? std::string(body["signature"].s()) : "";
+            std::string digest = Hash::compute(message, Hash::SHA1);
+
+            RSA::KeyPair kp = demo_signing_key();
+            kp.d = BigInt128(0ULL, 0ULL);
+            RSA verifier(kp);
+            bool valid = verifier.verify(digest_to_bigint(digest), BigInt128::fromHex(signature));
+            return ok(crow::json::wvalue{{"ok", valid}, {"hash", digest}});
+        } catch (const std::exception& ex) {
+            return err(400, ex.what());
+        }
     });
 
     // ── 7. 哈希 ───────────────────────────────────────────
@@ -431,11 +551,13 @@ int main() {
         auto body = crow::json::load(req.body);
         if (!body) return err(400, "invalid JSON");
 
-        std::string message = body["message"].s();
-        std::string algo    = body["algo"].s();  // "SHA1" or "MD5"
-
-        // TODO: auto h = Hash::compute(message, algo == "MD5" ? Hash::MD5 : Hash::SHA1);
-        return ok(crow::json::wvalue{{"hash", "NOT_IMPLEMENTED"}});
+        try {
+            std::string message = body["message"].s();
+            std::string algo    = body["algo"].s();  // "SHA1" or "MD5"
+            return ok(crow::json::wvalue{{"hash", Hash::compute(message, parse_hash_algo(algo))}});
+        } catch (const std::exception& ex) {
+            return err(400, ex.what());
+        }
     });
 
     // ── 8. 数字签名 ───────────────────────────────────────
@@ -445,13 +567,18 @@ int main() {
         auto body = crow::json::load(req.body);
         if (!body) return err(400, "invalid JSON");
 
-        std::string message = body["message"].s();
-        std::string algo    = body["algo"].s();
-
-        // TODO: DigitalSignature ds(key_pair);
-        //       auto sig = ds.sign(message, algo == "MD5" ? Hash::MD5 : Hash::SHA1);
-        //       return ok({{"signature", sig}, {"hash", hash}});
-        return ok(crow::json::wvalue{{"signature", "NOT_IMPLEMENTED"}, {"hash", "NOT_IMPLEMENTED"}});
+        try {
+            std::string message = body["message"].s();
+            std::string algo    = body["algo"].s();
+            Hash::Algo parsedAlgo = parse_hash_algo(algo);
+            DigitalSignature ds(demo_signing_key());
+            return ok(crow::json::wvalue{
+                {"signature", ds.sign(message, parsedAlgo)},
+                {"hash", Hash::compute(message, parsedAlgo)}
+            });
+        } catch (const std::exception& ex) {
+            return err(400, ex.what());
+        }
     });
 
     CROW_ROUTE(app, "/api/v1/sign/verify")
@@ -460,14 +587,19 @@ int main() {
         auto body = crow::json::load(req.body);
         if (!body) return err(400, "invalid JSON");
 
-        std::string message   = body["message"].s();
-        std::string signature = body["signature"].s();
-        std::string algo      = body["algo"].s();
-
-        // TODO: DigitalSignature ds(key_pair);
-        //       bool valid = ds.verify(message, signature, algo == "MD5" ? Hash::MD5 : Hash::SHA1);
-        //       return ok({{"valid", valid}, {"hash", hash}});
-        return ok(crow::json::wvalue{{"valid", false}, {"hash", "NOT_IMPLEMENTED"}});
+        try {
+            std::string message   = body["message"].s();
+            std::string signature = body["signature"].s();
+            std::string algo      = body["algo"].s();
+            Hash::Algo parsedAlgo = parse_hash_algo(algo);
+            DigitalSignature ds(demo_signing_key());
+            return ok(crow::json::wvalue{
+                {"valid", ds.verify(message, signature, parsedAlgo)},
+                {"hash", Hash::compute(message, parsedAlgo)}
+            });
+        } catch (const std::exception& ex) {
+            return err(400, ex.what());
+        }
     });
 
     // ── 9. 大文件加密传输 ─────────────────────────────────
@@ -488,35 +620,118 @@ int main() {
 
         if (file_data.empty()) return err(400, "missing file part");
 
-        // TODO: SecureFileTransfer sft;
-        //       auto id = sft.receiveAndEncrypt(file_data, cipher);
-        //       return ok({{"id", id}, {"chunks", ...}, {"hash", ...}});
-        std::string stub_id = "tx_" + std::to_string(std::time(nullptr));
-        return ok(crow::json::wvalue{
-            {"id",     stub_id},
-            {"chunks", 1},
-            {"hash",   "NOT_IMPLEMENTED"}
-        });
+        try {
+            SecureFileTransfer sft;
+            SecureFileTransfer::Config cfg;
+            cfg.cipher = cipher;
+            auto result = sft.receiveAndEncrypt(file_data, cipher, cfg);
+            return ok(crow::json::wvalue{
+                {"id", result.id},
+                {"chunks", result.chunks},
+                {"hash", result.hash},
+                {"signature", result.signature}
+            });
+        } catch (const std::exception& ex) {
+            return err(400, ex.what());
+        }
+    });
+
+    CROW_ROUTE(app, "/api/v1/file/init")
+    .methods("POST"_method)
+    ([](const crow::request& req) {
+        auto body = crow::json::load(req.body);
+        if (!body) return err(400, "invalid JSON");
+
+        try {
+            std::string name = body.has("name") ? std::string(body["name"].s()) : "upload.bin";
+            uint64_t size = body.has("size") ? static_cast<uint64_t>(body["size"].i()) : 0ULL;
+            std::string cipher = body.has("cipher") ? std::string(body["cipher"].s()) : "SHA1-CTR";
+            size_t chunkSize = body.has("chunkSize") ? static_cast<size_t>(body["chunkSize"].i()) : 4 * 1024 * 1024;
+
+            SecureFileTransfer::Config cfg;
+            cfg.cipher = cipher;
+            cfg.chunkSize = chunkSize;
+            SecureFileTransfer sft;
+            auto started = sft.startUpload(name, size, cipher, cfg);
+            return ok(crow::json::wvalue{
+                {"id", started.id},
+                {"chunkSize", started.chunkSize},
+                {"totalChunks", started.totalChunks},
+                {"serverPubKey", started.serverPubKey},
+                {"clientPubKey", started.clientPubKey},
+                {"keyFingerprint", started.keyFingerprint},
+                {"signature", started.signature}
+            });
+        } catch (const std::exception& ex) {
+            return err(400, ex.what());
+        }
+    });
+
+    CROW_ROUTE(app, "/api/v1/file/chunk/<string>/<int>")
+    .methods("POST"_method)
+    ([](const crow::request& req, const std::string& id, int index) {
+        try {
+            SecureFileTransfer sft;
+            auto result = sft.receiveChunk(id, index, req.body);
+            return ok(crow::json::wvalue{
+                {"id", result.id},
+                {"receivedChunks", result.receivedChunks},
+                {"progress", result.progress},
+                {"chunkHash", result.chunkHash},
+                {"encryptedHash", result.encryptedHash}
+            });
+        } catch (const std::exception& ex) {
+            return err(400, ex.what());
+        }
+    });
+
+    CROW_ROUTE(app, "/api/v1/file/complete/<string>")
+    .methods("POST"_method)
+    ([](const std::string& id) {
+        try {
+            SecureFileTransfer sft;
+            auto result = sft.finishUpload(id);
+            return ok(crow::json::wvalue{
+                {"id", result.id},
+                {"chunks", result.chunks},
+                {"hash", result.hash},
+                {"signature", result.signature}
+            });
+        } catch (const std::exception& ex) {
+            return err(400, ex.what());
+        }
     });
 
     CROW_ROUTE(app, "/api/v1/file/status/<string>")
     .methods("GET"_method)
     ([](const std::string& id) {
-        // TODO: auto status = sft.getStatus(id); return ok({{"id",id},{"progress",status.progress},...});
-        return ok(crow::json::wvalue{
-            {"id",       id},
-            {"progress", 100},
-            {"status",   "done"}
-        });
+        try {
+            SecureFileTransfer sft;
+            auto status = sft.getStatus(id);
+            return ok(crow::json::wvalue{
+                {"id", status.id},
+                {"progress", status.progress},
+                {"status", status.status}
+            });
+        } catch (const std::exception& ex) {
+            return err(404, ex.what());
+        }
     });
 
     CROW_ROUTE(app, "/api/v1/file/download/<string>")
     .methods("GET"_method)
     ([](const std::string& id) {
-        // TODO: auto data = sft.getFile(id); return binary response;
-        crow::response res(501, "NOT_IMPLEMENTED");
-        set_cors(res);
-        return res;
+        try {
+            SecureFileTransfer sft;
+            std::string data = sft.getFile(id);
+            crow::response res(200, data);
+            res.set_header("Content-Type", "application/octet-stream");
+            res.set_header("Content-Disposition", "attachment; filename=\"" + id + ".enc\"");
+            set_cors(res);
+            return res;
+        } catch (const std::exception& ex) {
+            return err(404, ex.what());
+        }
     });
 
     // ── 前端静态文件托管 ──────────────────────────────────

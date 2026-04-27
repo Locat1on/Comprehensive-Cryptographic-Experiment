@@ -1,9 +1,11 @@
 #pragma once
+
 #include "Hash.h"
-#include "BigInt128.h"
+
+#include <cstdint>
+#include <cstddef>
 #include <string>
 
-// Forward declaration — avoid pulling in crow_all.h here
 namespace crow {
     template<typename... Middlewares>
     class Crow;
@@ -13,7 +15,7 @@ namespace crow {
 class SecureFileTransfer {
 public:
     struct Config {
-        std::string cipher    = "AES-256-CTR";
+        std::string cipher    = "SHA1-CTR";
         size_t      chunkSize = 4 * 1024 * 1024;
         Hash::Algo  hashAlgo  = Hash::SHA1;
     };
@@ -22,22 +24,50 @@ public:
         std::string id;
         int         chunks;
         std::string hash;
+        std::string signature;
+        std::string path;
     };
 
     struct Status {
         std::string id;
-        int         progress;   // 0–100
-        std::string status;     // "pending" | "transferring" | "done" | "error"
+        int         progress;
+        std::string status;
     };
 
-    // 服务端：接收原始文件数据，返回任务 ID
+    struct StartResult {
+        std::string id;
+        int         chunkSize;
+        int         totalChunks;
+        std::string serverPubKey;
+        std::string clientPubKey;
+        std::string keyFingerprint;
+        std::string signature;
+    };
+
+    struct ChunkResult {
+        std::string id;
+        int         receivedChunks;
+        int         progress;
+        std::string chunkHash;
+        std::string encryptedHash;
+    };
+
     UploadResult receiveAndEncrypt(const std::string& fileData,
                                    const std::string& cipher,
                                    const Config& cfg);
 
-    // 服务端：查询传输状态
-    Status getStatus(const std::string& id);
+    StartResult startUpload(const std::string& fileName,
+                            uint64_t fileSize,
+                            const std::string& cipher,
+                            const Config& cfg);
 
-    // 服务端：返回加密后文件数据
+    ChunkResult receiveChunk(const std::string& id,
+                             int chunkIndex,
+                             const std::string& chunkData);
+
+    UploadResult finishUpload(const std::string& id);
+
+    Status getStatus(const std::string& id);
     std::string getFile(const std::string& id);
+    std::string getFilePath(const std::string& id);
 };

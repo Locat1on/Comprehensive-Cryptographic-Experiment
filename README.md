@@ -69,14 +69,14 @@ Comprehensive-Cryptographic-Experiment/
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│  浏览器  http://localhost:8080/                          │
+│  浏览器  http://localhost:8888/                          │
 │  frontend/index.html + css/ + js/                       │
 │  前端只负责 UI 与 API 调用，不含任何密码学计算           │
 └────────────────────────┬────────────────────────────────┘
                          │ fetch (JSON / FormData)
                          ▼
 ┌─────────────────────────────────────────────────────────┐
-│  Crow HTTP Server  :8080                                │
+│  Crow HTTP Server  :8888                                │
 │  src/main.cpp                                           │
 │  ├── GET  /             托管 frontend/index.html        │
 │  ├── GET  /<path>       托管 frontend/ 静态资源          │
@@ -156,11 +156,11 @@ server.exe
 看到以下输出即启动成功：
 
 ```
-[INFO] Frontend: http://localhost:8080/
-[INFO] Crow/1.2.0 server is running at http://0.0.0.0:8080
+[INFO] Frontend: http://localhost:8888/
+[INFO] Crow/1.2.0 server is running at http://0.0.0.0:8888
 ```
 
-浏览器打开 **http://localhost:8080/** 即可使用前端界面。
+浏览器打开 **http://localhost:8888/** 即可使用前端界面。
 
 > 注意：不要直接双击打开 `frontend/index.html`，Babel 在 `file://` 协议下无法加载外部 `.jsx` 文件，必须通过 HTTP 访问。
 
@@ -169,7 +169,7 @@ server.exe
 如需部署到其他地址，修改 `frontend/js/api.js` 第一行：
 
 ```js
-const API_BASE = 'http://localhost:8080/api/v1';
+const API_BASE = 'http://localhost:8888/api/v1';
 ```
 
 ---
@@ -195,7 +195,7 @@ cd backend
 .\server.exe
 ```
 
-浏览器访问 http://localhost:8080/，确认页面正常加载（此时所有功能返回 "NOT_IMPLEMENTED" 是正常的）。
+浏览器访问 http://localhost:8888/，确认页面正常加载（此时所有功能返回 "NOT_IMPLEMENTED" 是正常的）。
 
 ### 3. 选择首个任务
 
@@ -230,7 +230,7 @@ cd backend
 3. **实现算法**：在 `crypto/src/` 对应 `.cpp` 文件中替换 `throw std::runtime_error(...)`，填写实际算法
 4. **本地测试**：在 `.cpp` 底部添加临时 `main()` 函数进行单元测试（提交前删除）
 5. **构建运行**：在 `backend/` 目录运行 `build.ps1` 重新构建，启动 `server.exe`
-6. **联调验证**：浏览器打开 http://localhost:8080/ 测试对应功能面板
+6. **联调验证**：浏览器打开 http://localhost:8888/ 测试对应功能面板
 7. **提交代码**：确保无编译警告，提交信息格式：`feat(模块): 实现功能简述`
 
 ### 开发规范

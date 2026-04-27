@@ -64,13 +64,13 @@ function Run-Step([string]$tool, [string[]]$arguments, [string]$failureMessage) 
 $gxx = Resolve-Tool "GXX" "g++"
 $ar = Resolve-Tool "AR" "ar"
 $asioInclude = Resolve-IncludeRoot "ASIO_ROOT" @(
+    "$PSScriptRoot\lib\asio",
+    "$PSScriptRoot\lib\asio\include",
+    "$PSScriptRoot\lib",
     "C:\msys64\mingw64\include",
     "F:\msys2\mingw64\include",
     "D:\msys64\mingw64\include",
-    "D:\msys2\mingw64\include",
-    "$PSScriptRoot\lib\asio",
-    "$PSScriptRoot\lib\asio\include",
-    "$PSScriptRoot\lib"
+    "D:\msys2\mingw64\include"
 ) "asio.hpp"
 
 if (-not $gxx) {
@@ -113,7 +113,8 @@ if ($asioInclude) {
 $compilerFlags = @(
     "-std=c++17",
     "-O2",
-    "-DASIO_STANDALONE"
+    "-DASIO_STANDALONE",
+    "-DCROW_FILESYSTEM_IS_EXPERIMENTAL"
 )
 
 $sourceFiles = @(
