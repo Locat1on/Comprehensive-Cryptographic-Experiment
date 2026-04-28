@@ -37,3 +37,5 @@ backend/lib/asio_extracted/
 # 服务器输出日志
 backend/server_out.txt
 backend/server_err.txt
+
+docs/
