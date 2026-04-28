@@ -230,7 +230,7 @@ int main() {
     });
 
     // ── 3. 流密码 ─────────────────────────────────────────
-    CROW_ROUTE(app, "/api/v1/stream/rc4")
+    CROW_ROUTE(app, "/api/v1/stream/rc4/encrypt")
     .methods("POST"_method)
     ([](const crow::request& req) {
         auto body = crow::json::load(req.body);
@@ -254,7 +254,7 @@ int main() {
         });
     });
 
-    CROW_ROUTE(app, "/api/v1/stream/lfsr")
+    CROW_ROUTE(app, "/api/v1/stream/lfsr/encrypt")
     .methods("POST"_method)
     ([](const crow::request& req) {
         auto body = crow::json::load(req.body);
@@ -275,6 +275,52 @@ int main() {
         return ok(crow::json::wvalue{
             {"ciphertext", bytes_to_hex(cipher)},
             {"keystream",  bytes_to_hex(ks)}
+        });
+    });
+
+    CROW_ROUTE(app, "/api/v1/stream/rc4/decrypt")
+    .methods("POST"_method)
+    ([](const crow::request& req) {
+        auto body = crow::json::load(req.body);
+        if (!body) return err(400, "invalid JSON");
+
+        std::string seed       = body["seed"].s();
+        std::string ciphertext = body["ciphertext"].s();
+
+        auto seed_bytes   = hex_to_bytes(seed);
+        auto cipher_bytes = hex_to_bytes(ciphertext);
+
+        if (seed_bytes.empty())   return err(400, "invalid seed");
+        if (cipher_bytes.empty()) return err(400, "invalid ciphertext");
+
+        StreamCipher sc(seed_bytes, StreamCipher::RC4);
+        auto plain = sc.decrypt(cipher_bytes);
+
+        return ok(crow::json::wvalue{
+            {"plaintext", std::string(plain.begin(), plain.end())}
+        });
+    });
+
+    CROW_ROUTE(app, "/api/v1/stream/lfsr/decrypt")
+    .methods("POST"_method)
+    ([](const crow::request& req) {
+        auto body = crow::json::load(req.body);
+        if (!body) return err(400, "invalid JSON");
+
+        std::string seed       = body["seed"].s();
+        std::string ciphertext = body["ciphertext"].s();
+
+        auto seed_bytes   = hex_to_bytes(seed);
+        auto cipher_bytes = hex_to_bytes(ciphertext);
+
+        if (seed_bytes.empty())   return err(400, "invalid seed");
+        if (cipher_bytes.empty()) return err(400, "invalid ciphertext");
+
+        StreamCipher sc(seed_bytes, StreamCipher::LFSR_JK);
+        auto plain = sc.decrypt(cipher_bytes);
+
+        return ok(crow::json::wvalue{
+            {"plaintext", std::string(plain.begin(), plain.end())}
         });
     });
 

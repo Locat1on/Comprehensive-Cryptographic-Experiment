@@ -26,3 +26,4 @@ private:
     void initRC4();
     void initLFSR();
 };
+
