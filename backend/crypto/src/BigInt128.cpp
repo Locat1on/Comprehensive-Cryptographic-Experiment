@@ -3,27 +3,59 @@
 #include <algorithm>
 #include <sstream>
 #include <iomanip>
+#include <array>
 
 // ── BigInt128 ─────────────────────────────────────────────────
 
 BigInt128::BigInt128(uint64_t hi, uint64_t lo) : hi_(hi), lo_(lo) {}
 
 BigInt128::BigInt128(const std::string& dec) : hi_(0), lo_(0) {
-    // 逐位解析十进制字符串，跳过非数字字符
-    for (char c : dec) {
-        if (c < '0' || c > '9') continue;
-        // this = this * 10 + digit，使用 unsigned __int128 处理进位
-        unsigned __int128 val = ((unsigned __int128)hi_ << 64) | lo_;
-        val = val * 10 + (unsigned)(c - '0');
-        hi_ = (uint64_t)(val >> 64);
-        lo_ = (uint64_t)val;
+    if (dec.empty())
+        throw std::runtime_error("BigInt128(dec): empty input");
+
+    size_t idx = 0;
+    bool negative = false;
+    if (dec[0] == '+' || dec[0] == '-') {
+        negative = (dec[0] == '-');
+        idx = 1;
+        if (idx == dec.size())
+            throw std::runtime_error("BigInt128(dec): invalid decimal string");
     }
+
+    const unsigned __int128 max128 = ~((unsigned __int128)0);
+    unsigned __int128 value = 0;
+    for (; idx < dec.size(); ++idx) {
+        char c = dec[idx];
+        if (c < '0' || c > '9')
+            throw std::runtime_error("BigInt128(dec): invalid decimal string");
+        unsigned digit = static_cast<unsigned>(c - '0');
+        if (value > (max128 - digit) / 10)
+            throw std::runtime_error("BigInt128(dec): overflow (>128 bits)");
+        value = value * 10 + digit;
+    }
+
+    if (negative) {
+        const unsigned __int128 maxAbs = (static_cast<unsigned __int128>(1) << 127);
+        if (value > maxAbs)
+            throw std::runtime_error("BigInt128(dec): overflow for negative value");
+        value = (static_cast<unsigned __int128>(0) - value) & max128;
+    }
+
+    hi_ = static_cast<uint64_t>(value >> 64);
+    lo_ = static_cast<uint64_t>(value);
 }
 
 BigInt128 BigInt128::operator+(const BigInt128& rhs) const {
     uint64_t lo = lo_ + rhs.lo_;
     uint64_t carry = (lo < lo_) ? 1ULL : 0ULL;
     uint64_t hi = hi_ + rhs.hi_ + carry;
+
+    bool sign_a = (hi_ >> 63) != 0;
+    bool sign_b = (rhs.hi_ >> 63) != 0;
+    bool sign_r = (hi >> 63) != 0;
+    if (sign_a == sign_b && sign_r != sign_a)
+        throw std::runtime_error("BigInt128::operator+: overflow (>128 bits)");
+
     return BigInt128(hi, lo);
 }
 
@@ -35,21 +67,20 @@ BigInt128 BigInt128::operator-(const BigInt128& rhs) const {
 }
 
 BigInt256 BigInt128::operator*(const BigInt128& rhs) const {
-    // 将两个 128 位数各拆为两个 64 位半段，做四次 64x64->128 乘法后合并
     uint64_t a_lo = lo_, a_hi = hi_;
     uint64_t b_lo = rhs.lo_, b_hi = rhs.hi_;
 
-    unsigned __int128 p00 = (unsigned __int128)a_lo * b_lo;   // 贡献 bits 0..127
-    unsigned __int128 p01 = (unsigned __int128)a_lo * b_hi;   // 贡献 bits 64..191
-    unsigned __int128 p10 = (unsigned __int128)a_hi * b_lo;   // 贡献 bits 64..191
-    unsigned __int128 p11 = (unsigned __int128)a_hi * b_hi;   // 贡献 bits 128..255
+    unsigned __int128 p00 = static_cast<unsigned __int128>(a_lo) * b_lo;
+    unsigned __int128 p01 = static_cast<unsigned __int128>(a_lo) * b_hi;
+    unsigned __int128 p10 = static_cast<unsigned __int128>(a_hi) * b_lo;
+    unsigned __int128 p11 = static_cast<unsigned __int128>(a_hi) * b_hi;
 
-    uint64_t w0 = (uint64_t)p00;
+    uint64_t w0 = static_cast<uint64_t>(p00);
     unsigned __int128 mid = (p00 >> 64) + p01 + p10;
-    uint64_t w1 = (uint64_t)mid;
-    unsigned __int128 hi2 = (mid >> 64) + p11;
-    uint64_t w2 = (uint64_t)hi2;
-    uint64_t w3 = (uint64_t)(hi2 >> 64);
+    uint64_t w1 = static_cast<uint64_t>(mid);
+    unsigned __int128 high = (mid >> 64) + p11;
+    uint64_t w2 = static_cast<uint64_t>(high);
+    uint64_t w3 = static_cast<uint64_t>(high >> 64);
 
     return BigInt256(w3, w2, w1, w0);
 }
@@ -73,15 +104,23 @@ std::string BigInt128::toHex() const {
 }
 
 std::string BigInt128::toDec() const {
-    if (hi_ == 0 && lo_ == 0) return "0";
-    // 通过反复除 10 收集余数
-    unsigned __int128 val = ((unsigned __int128)hi_ << 64) | lo_;
+    unsigned __int128 val = (static_cast<unsigned __int128>(hi_) << 64) | lo_;
+    if (val == 0)
+        return "0";
+
+    bool negative = (hi_ & (1ull << 63)) != 0;
+    if (negative) {
+        val = (~val) + 1;
+    }
+
     std::string result;
     while (val > 0) {
-        result += char('0' + (int)(val % 10));
+        result += static_cast<char>('0' + static_cast<int>(val % 10));
         val /= 10;
     }
     std::reverse(result.begin(), result.end());
+    if (negative)
+        result.insert(result.begin(), '-');
     return result;
 }
 
