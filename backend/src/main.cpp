@@ -250,7 +250,7 @@ int main() {
 
         return ok(crow::json::wvalue{
             {"ciphertext", bytes_to_hex(cipher)},
-            {"keystream",  bytes_to_hex(ks)}
+            {"key-stream",  bytes_to_hex(ks)}
         });
     });
 
@@ -648,40 +648,7 @@ int main() {
         }
     });
 
-    // ── 9. 大文件加密传输 ─────────────────────────────────
-    CROW_ROUTE(app, "/api/v1/file/encrypt-upload")
-    .methods("POST"_method)
-    ([](const crow::request& req) {
-        crow::multipart::message mp(req);
-
-        std::string cipher     = "AES-256-CTR";
-        std::string file_data;
-
-        for (auto& part : mp.part_map) {
-            if (part.first == "cipher")
-                cipher = part.second.body;
-            else if (part.first == "file")
-                file_data = part.second.body;
-        }
-
-        if (file_data.empty()) return err(400, "missing file part");
-
-        try {
-            SecureFileTransfer sft;
-            SecureFileTransfer::Config cfg;
-            cfg.cipher = cipher;
-            auto result = sft.receiveAndEncrypt(file_data, cipher, cfg);
-            return ok(crow::json::wvalue{
-                {"id", result.id},
-                {"chunks", result.chunks},
-                {"hash", result.hash},
-                {"signature", result.signature}
-            });
-        } catch (const std::exception& ex) {
-            return err(400, ex.what());
-        }
-    });
-
+    // ── 9. 大文件加密传输 (中继模式) ────────────────────────
     CROW_ROUTE(app, "/api/v1/file/init")
     .methods("POST"_method)
     ([](const crow::request& req) {
@@ -691,22 +658,39 @@ int main() {
         try {
             std::string name = body.has("name") ? std::string(body["name"].s()) : "upload.bin";
             uint64_t size = body.has("size") ? static_cast<uint64_t>(body["size"].i()) : 0ULL;
-            std::string cipher = body.has("cipher") ? std::string(body["cipher"].s()) : "SHA1-CTR";
+            std::string pubKey = body.has("pubKey") ? std::string(body["pubKey"].s()) : "";
             size_t chunkSize = body.has("chunkSize") ? static_cast<size_t>(body["chunkSize"].i()) : 4 * 1024 * 1024;
 
             SecureFileTransfer::Config cfg;
-            cfg.cipher = cipher;
             cfg.chunkSize = chunkSize;
             SecureFileTransfer sft;
-            auto started = sft.startUpload(name, size, cipher, cfg);
+            auto started = sft.startUpload(name, size, pubKey, cfg);
             return ok(crow::json::wvalue{
                 {"id", started.id},
                 {"chunkSize", started.chunkSize},
                 {"totalChunks", started.totalChunks},
-                {"serverPubKey", started.serverPubKey},
-                {"clientPubKey", started.clientPubKey},
-                {"keyFingerprint", started.keyFingerprint},
-                {"signature", started.signature}
+                {"status", started.status}
+            });
+        } catch (const std::exception& ex) {
+            return err(400, ex.what());
+        }
+    });
+
+    CROW_ROUTE(app, "/api/v1/file/join/<string>")
+    .methods("POST"_method)
+    ([](const crow::request& req, const std::string& id) {
+        auto body = crow::json::load(req.body);
+        if (!body) return err(400, "invalid JSON");
+        try {
+            std::string pubKey = body.has("pubKey") ? std::string(body["pubKey"].s()) : "";
+            SecureFileTransfer sft;
+            auto result = sft.joinTransfer(id, pubKey);
+            return ok(crow::json::wvalue{
+                {"senderPubKey", result.senderPubKey},
+                {"fileName", result.fileName},
+                {"fileSize", (uint64_t)result.fileSize},
+                {"totalChunks", result.totalChunks},
+                {"chunkSize", result.chunkSize}
             });
         } catch (const std::exception& ex) {
             return err(400, ex.what());
@@ -723,11 +707,25 @@ int main() {
                 {"id", result.id},
                 {"receivedChunks", result.receivedChunks},
                 {"progress", result.progress},
-                {"chunkHash", result.chunkHash},
                 {"encryptedHash", result.encryptedHash}
             });
         } catch (const std::exception& ex) {
             return err(400, ex.what());
+        }
+    });
+
+    CROW_ROUTE(app, "/api/v1/file/pull/<string>/<int>")
+    .methods("GET"_method)
+    ([](const std::string& id, int index) {
+        try {
+            SecureFileTransfer sft;
+            std::string data = sft.getChunk(id, index);
+            crow::response res(200, data);
+            res.set_header("Content-Type", "application/octet-stream");
+            set_cors(res);
+            return res;
+        } catch (const std::exception& ex) {
+            return err(404, ex.what());
         }
     });
 
@@ -736,13 +734,8 @@ int main() {
     ([](const std::string& id) {
         try {
             SecureFileTransfer sft;
-            auto result = sft.finishUpload(id);
-            return ok(crow::json::wvalue{
-                {"id", result.id},
-                {"chunks", result.chunks},
-                {"hash", result.hash},
-                {"signature", result.signature}
-            });
+            sft.finishUpload(id);
+            return ok(crow::json::wvalue{{"status", "done"}});
         } catch (const std::exception& ex) {
             return err(400, ex.what());
         }
@@ -753,30 +746,59 @@ int main() {
     ([](const std::string& id) {
         try {
             SecureFileTransfer sft;
-            auto status = sft.getStatus(id);
+            auto info = sft.getTransferInfo(id);
             return ok(crow::json::wvalue{
-                {"id", status.id},
-                {"progress", status.progress},
-                {"status", status.status}
+                {"id", info.id},
+                {"status", info.status},
+                {"receivedChunks", info.receivedChunks},
+                {"totalChunks", info.totalChunks},
+                {"receiverPubKey", info.receiverPubKey},
+                {"senderPubKey", info.senderPubKey}
             });
         } catch (const std::exception& ex) {
             return err(404, ex.what());
         }
     });
 
-    CROW_ROUTE(app, "/api/v1/file/download/<string>")
+    CROW_ROUTE(app, "/api/v1/file/info/<string>")
     .methods("GET"_method)
     ([](const std::string& id) {
         try {
             SecureFileTransfer sft;
-            std::string data = sft.getFile(id);
-            crow::response res(200, data);
-            res.set_header("Content-Type", "application/octet-stream");
-            res.set_header("Content-Disposition", "attachment; filename=\"" + id + ".enc\"");
-            set_cors(res);
-            return res;
+            auto info = sft.getTransferInfo(id);
+            return ok(crow::json::wvalue{
+                {"id", info.id},
+                {"fileName", info.fileName},
+                {"fileSize", (uint64_t)info.fileSize},
+                {"totalChunks", info.totalChunks},
+                {"status", info.status},
+                {"cipher", info.cipher}
+            });
         } catch (const std::exception& ex) {
             return err(404, ex.what());
+        }
+    });
+
+    CROW_ROUTE(app, "/api/v1/file/list")
+    .methods("GET"_method)
+    ([]() {
+        try {
+            SecureFileTransfer sft;
+            auto list = sft.listTransfers();
+            crow::json::wvalue::list jl;
+            for (const auto& info : list) {
+                jl.push_back(crow::json::wvalue{
+                    {"id", info.id},
+                    {"fileName", info.fileName},
+                    {"fileSize", (uint64_t)info.fileSize},
+                    {"totalChunks", info.totalChunks},
+                    {"status", info.status},
+                    {"cipher", info.cipher}
+                });
+            }
+            return ok(crow::json::wvalue{{"transfers", std::move(jl)}});
+        } catch (const std::exception& ex) {
+            return err(500, ex.what());
         }
     });
 

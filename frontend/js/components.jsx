@@ -53,12 +53,12 @@ function FileDropZone({ label = 'XML / KEY FILE', accept = '.xml,.key,.txt', onF
       <div style={{ width: 28, height: 28, margin: '0 auto 6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         {fileName
           ? <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 8l4 4 8-8" stroke="#00944a" strokeWidth="2" strokeLinecap="round" /></svg>
-          : <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 2v9M4 7l4-5 4 5" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" opacity=".5" /><path d="M2 13h12" stroke="#000" strokeWidth="1.5" strokeLinecap="round" opacity=".3" /></svg>}
+          : <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 2v9M4 7l4-5 4 5" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" opacity=".6" /><path d="M2 13h12" stroke="#000" strokeWidth="1.5" strokeLinecap="round" opacity=".4" /></svg>}
       </div>
-      <div style={{ fontSize: 13, fontWeight: 500, color: fileName ? '#00944a' : 'rgba(0,0,0,0.75)', letterSpacing: '-0.01em' }}>
+      <div style={{ fontSize: 13, fontWeight: 500, color: fileName ? '#00944a' : 'rgba(0,0,0,0.85)', letterSpacing: '-0.01em' }}>
         {fileName || label}
       </div>
-      {!fileName && <div style={{ fontSize: 12, color: 'rgba(0,0,0,0.5)', marginTop: 4 }}>点击或拖拽上传</div>}
+      {!fileName && <div style={{ fontSize: 12, color: 'rgba(0,0,0,0.7)', marginTop: 4 }}>点击或拖拽上传</div>}
       {fileName && (
         <button
           className="btn btn-sm btn-outline"
@@ -76,9 +76,9 @@ function SectionHeader({ title, subtitle, badge }) {
     <div style={{ marginBottom: 32 }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
         <div>
-          {badge && <div style={{ fontFamily: 'var(--mono)', fontSize: 12, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'rgba(0,0,0,0.4)', marginBottom: 10 }}>{badge}</div>}
+          {badge && <div style={{ fontFamily: 'var(--mono)', fontSize: 12, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'rgba(0,0,0,0.6)', marginBottom: 10 }}>{badge}</div>}
           <h2 style={{ fontSize: 34, fontWeight: 600, letterSpacing: '-0.04em', color: '#010120', lineHeight: 1.1 }}>{title}</h2>
-          {subtitle && <p style={{ fontSize: 16, color: 'rgba(0,0,0,0.55)', marginTop: 10, letterSpacing: '-0.01em', lineHeight: 1.5 }}>{subtitle}</p>}
+          {subtitle && <p style={{ fontSize: 16, color: 'rgba(0,0,0,0.75)', marginTop: 10, letterSpacing: '-0.01em', lineHeight: 1.5 }}>{subtitle}</p>}
         </div>
       </div>
     </div>

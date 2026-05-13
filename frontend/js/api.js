@@ -58,3 +58,36 @@ async function apiUploadRaw(path, blob) {
   }
   return res.json();
 }
+
+async function apiDownloadFile(path, filename) {
+  let res;
+  try {
+    res = await fetch(`${API_BASE}${path}`);
+  } catch {
+    throw new Error('⚠ 后端未连接 — 请先启动 server.exe (localhost:8888)');
+  }
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`下载失败 HTTP ${res.status}${text ? ': ' + text : ''}`);
+  }
+  const blob = await res.blob();
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename || 'downloaded_file';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.URL.revokeObjectURL(url);
+}
+
+async function apiGetBinary(path) {
+  let res;
+  try {
+    res = await fetch(`${API_BASE}${path}`);
+  } catch {
+    throw new Error('⚠ 后端未连接 — 请先启动 server.exe (localhost:8888)');
+  }
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.arrayBuffer();
+}
