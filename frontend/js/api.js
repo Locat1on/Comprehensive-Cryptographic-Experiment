@@ -1,5 +1,5 @@
 // TODO(deploy): 修改为实际后端地址
-const API_BASE = 'http://localhost:8888/api/v1';
+const API_BASE = '/api/v1';
 
 async function apiCall(path, body = {}) {
   let res;

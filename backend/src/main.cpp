@@ -451,8 +451,12 @@ int main() {
 
             crow::json::wvalue::list block_list;
             block_list.reserve(blocks.size());
-            for (const auto& b : blocks)
-                block_list.emplace_back((int64_t)std::stoull(b.toDec()));
+            for (const auto& b : blocks) {
+                char hex[5];
+                std::snprintf(hex, sizeof(hex), "%04llX",
+                              (unsigned long long)std::stoull(b.toDec()));
+                block_list.emplace_back(std::string(hex));
+            }
 
             return ok(crow::json::wvalue{{"blocks", std::move(block_list)}});
         } catch (const std::exception& ex) {
@@ -479,7 +483,8 @@ int main() {
             std::vector<BigInt128> blocks;
             blocks.reserve(blocks_json.size());
             for (size_t i = 0; i < blocks_json.size(); i++)
-                blocks.emplace_back(BigInt128(0ULL, (uint64_t)blocks_json[i].i()));
+                blocks.emplace_back(BigInt128(0ULL,
+                    (uint64_t)std::stoull(std::string(blocks_json[i].s()), nullptr, 16)));
 
             RSA rsa(kp);
             return ok(crow::json::wvalue{{"message", rsa.decrypt(blocks)}});
@@ -617,7 +622,15 @@ int main() {
             std::string message = body["message"].s();
             std::string algo    = body["algo"].s();
             Hash::Algo parsedAlgo = parse_hash_algo(algo);
-            DigitalSignature ds(demo_signing_key());
+            RSA::KeyPair kp;
+            if (body.has("key")) {
+                kp.n = BigInt128(0ULL, (uint64_t)body["key"]["n"].i());
+                kp.d = BigInt128(0ULL, (uint64_t)body["key"]["d"].i());
+                kp.e = BigInt128(0ULL, (uint64_t)body["key"]["e"].i());
+            } else {
+                kp = demo_signing_key();
+            }
+            DigitalSignature ds(kp);
             return ok(crow::json::wvalue{
                 {"signature", ds.sign(message, parsedAlgo)},
                 {"hash", Hash::compute(message, parsedAlgo)}
@@ -638,7 +651,15 @@ int main() {
             std::string signature = body["signature"].s();
             std::string algo      = body["algo"].s();
             Hash::Algo parsedAlgo = parse_hash_algo(algo);
-            DigitalSignature ds(demo_signing_key());
+            RSA::KeyPair kp;
+            if (body.has("key")) {
+                kp.n = BigInt128(0ULL, (uint64_t)body["key"]["n"].i());
+                kp.e = BigInt128(0ULL, (uint64_t)body["key"]["e"].i());
+                kp.d = BigInt128(0ULL, 0ULL);
+            } else {
+                kp = demo_signing_key();
+            }
+            DigitalSignature ds(kp);
             return ok(crow::json::wvalue{
                 {"valid", ds.verify(message, signature, parsedAlgo)},
                 {"hash", Hash::compute(message, parsedAlgo)}

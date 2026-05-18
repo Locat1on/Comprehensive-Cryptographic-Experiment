@@ -334,7 +334,7 @@ function LargeFileTransfer({ apiShow }) {
                   { label: '当前进度', value: `${receiveProgress}%` },
                 ].map(r => (
                   <div key={r.label} style={{ display: 'grid', gridTemplateColumns: '80px auto', gap: 8, fontSize: 13, marginBottom: 6 }}>
-                    <span style={{ color: 'rgba(0,0,0,0.75)' }}>{r.label}</span>
+                    <span style={{ color: '#010120' }}>{r.label}</span>
                     <span style={{ fontWeight: 600 }}>{r.value}</span>
                   </div>
                 ))}

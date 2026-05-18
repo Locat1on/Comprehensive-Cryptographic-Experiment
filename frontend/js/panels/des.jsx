@@ -1,22 +1,51 @@
 function DESCipher({ apiShow }) {
   const { useState } = React;
   const [key, setKey] = useState('133457799BBCDFF1');
-  const [plaintext, setPlaintext] = useState('0123456789ABCDEF');
-  const [mode, setMode] = useState('encrypt');
+  const [plaintext, setPlaintext] = useState('Hello DES');
+  const [ciphertext, setCiphertext] = useState('');
   const [cipherMode, setCipherMode] = useState('ECB');
   const [result, setResult] = useState('');
   const [loading, setLoading] = useState(false);
 
-  async function run() {
+  function textToHex(text) {
+    return Array.from(text)
+      .map(c => c.charCodeAt(0).toString(16).padStart(2, '0'))
+      .join('').toUpperCase();
+  }
+
+  function hexToText(hex) {
+    try {
+      return (hex.match(/.{2}/g) ?? []).map(h => String.fromCharCode(parseInt(h, 16))).join('');
+    } catch { return hex; }
+  }
+
+  async function encrypt() {
     setLoading(true);
     setResult('');
     try {
-      const json = await apiCall(`/des/${mode}`, {
-        data: plaintext.replace(/\s/g, ''),
+      const json = await apiCall('/des/encrypt', {
+        data: textToHex(plaintext),
         key: key.replace(/\s/g, ''),
         mode: cipherMode,
       });
-      setResult(json.result ?? JSON.stringify(json));
+      setCiphertext(json.result ?? JSON.stringify(json));
+    } catch (e) {
+      setResult(e.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function decrypt() {
+    setLoading(true);
+    setResult('');
+    try {
+      const json = await apiCall('/des/decrypt', {
+        data: ciphertext.replace(/\s/g, ''),
+        key: key.replace(/\s/g, ''),
+        mode: cipherMode,
+      });
+      setResult(hexToText(json.result ?? ''));
     } catch (e) {
       setResult(e.message);
     } finally {
@@ -35,32 +64,25 @@ function DESCipher({ apiShow }) {
             <input className="inp mono" value={key} onChange={e => setKey(e.target.value)} placeholder="16个HEX字符" />
           </div>
           <div>
-            <MonoLabel>XML 密钥文件</MonoLabel>
-            <FileDropZone label="des-key.xml" accept=".xml,.key"
-              onFile={c => { const m = c.match(/<key>([^<]+)<\/key>/); if (m) setKey(m[1].trim()); }} />
+            <MonoLabel>模式</MonoLabel>
+            <div className="toggle-group">
+              <button className={`toggle-btn${cipherMode === 'ECB' ? ' active' : ''}`} onClick={() => setCipherMode('ECB')}>ECB</button>
+              <button className={`toggle-btn${cipherMode === 'CBC' ? ' active' : ''}`} onClick={() => setCipherMode('CBC')}>CBC</button>
+            </div>
           </div>
           <div>
-            <MonoLabel>明文 / 密文 (HEX)</MonoLabel>
+            <MonoLabel>明文</MonoLabel>
             <textarea className="inp mono" rows={3} value={plaintext} onChange={e => setPlaintext(e.target.value)} />
           </div>
-          <div className="grid-2">
-            <div>
-              <MonoLabel>操作</MonoLabel>
-              <div className="toggle-group">
-                <button className={`toggle-btn${mode === 'encrypt' ? ' active' : ''}`} onClick={() => setMode('encrypt')}>加密</button>
-                <button className={`toggle-btn${mode === 'decrypt' ? ' active' : ''}`} onClick={() => setMode('decrypt')}>解密</button>
-              </div>
-            </div>
-            <div>
-              <MonoLabel>模式</MonoLabel>
-              <div className="toggle-group">
-                <button className={`toggle-btn${cipherMode === 'ECB' ? ' active' : ''}`} onClick={() => setCipherMode('ECB')}>ECB</button>
-                <button className={`toggle-btn${cipherMode === 'CBC' ? ' active' : ''}`} onClick={() => setCipherMode('CBC')}>CBC</button>
-              </div>
-            </div>
+          <button className="btn btn-primary" onClick={encrypt} disabled={loading} style={{ justifyContent: 'center' }}>
+            {loading ? '请求中...' : '▶  加密'}
+          </button>
+          <div>
+            <MonoLabel>密文 (HEX)</MonoLabel>
+            <textarea className="inp mono" rows={3} value={ciphertext} onChange={e => setCiphertext(e.target.value)} placeholder="加密后自动填入，或手动粘贴..." />
           </div>
-          <button className="btn btn-primary" onClick={run} disabled={loading} style={{ justifyContent: 'center' }}>
-            {loading ? '请求中...' : `▶  执行 DES ${mode === 'encrypt' ? '加密' : '解密'}`}
+          <button className="btn btn-outline" onClick={decrypt} disabled={loading} style={{ justifyContent: 'center' }}>
+            {loading ? '请求中...' : '◀  解密'}
           </button>
           {apiShow && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -70,11 +92,16 @@ function DESCipher({ apiShow }) {
           )}
         </div>
         <div className="col">
+          <div>
+            <MonoLabel>XML 密钥文件</MonoLabel>
+            <FileDropZone label="des-key.xml" accept=".xml,.key"
+              onFile={c => { const m = c.match(/<key>([^<]+)<\/key>/); if (m) setKey(m[1].trim()); }} />
+          </div>
           <div style={{ background: 'rgba(1,1,32,0.03)', border: '1px solid var(--border-light)', borderRadius: 'var(--r-md)', padding: 20 }}>
             <MonoLabel>Feistel 结构</MonoLabel>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 12 }}>
               {[
-                { step: 'IP', desc: '初始置换 (64-bit 输入)' },
+                { step: 'IP',  desc: '初始置换 (64-bit 输入)' },
                 { step: '×16', desc: '每轮: L(i)=R(i-1), R(i)=L(i-1)⊕f(R(i-1),Kᵢ)', accent: true },
                 { step: 'f()', desc: 'E扩展 → XOR子密钥 → 8个S盒 → P置换' },
                 { step: 'IP⁻¹', desc: '逆置换输出 64-bit 密文' },
@@ -86,7 +113,7 @@ function DESCipher({ apiShow }) {
               ))}
             </div>
           </div>
-          <ResultBox value={result} label="结果" />
+          <ResultBox value={result} label="解密结果" />
         </div>
       </div>
     </div>

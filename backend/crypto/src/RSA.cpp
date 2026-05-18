@@ -33,6 +33,29 @@ static uint64_t gcd64(uint64_t a, uint64_t b) {
     return a;
 }
 
+// Miller-Rabin 单轮素性检验（见证数 a）
+static bool millerRabin(uint64_t n, uint64_t a) {
+    if (n % a == 0) return n == a;
+    uint64_t d = n - 1;
+    int r = 0;
+    while (d % 2 == 0) { d /= 2; ++r; }
+    uint64_t x = modpow(a, d, n);
+    if (x == 1 || x == n - 1) return true;
+    for (int j = 0; j < r - 1; ++j) {
+        x = modpow(x, 2, n);
+        if (x == n - 1) return true;
+    }
+    return false;
+}
+
+// 对 uint16_t 范围（n < 65536），见证 {2, 3} 给出确定性结果（覆盖 n < 1,373,653）
+static bool isPrime(uint16_t n) {
+    if (n < 2) return false;
+    if (n == 2 || n == 3) return true;
+    if (n % 2 == 0 || n % 3 == 0) return false;
+    return millerRabin((uint64_t)n, 2) && millerRabin((uint64_t)n, 3);
+}
+
 // 将 BigInt128 转为 uint64_t（RSA 中 n < 2^16，值很小）
 static uint64_t toLong(const BigInt128& v) {
     std::string dec = v.toDec();
@@ -61,6 +84,8 @@ static uint64_t bigmod(const BigInt128& v, uint64_t n) {
 RSA::KeyPair RSA::generate(uint16_t p, uint16_t q, uint16_t e) {
     if (p < 2 || q < 2)
         throw std::runtime_error("RSA::generate: p and q must be >= 2");
+    if (!isPrime(p) || !isPrime(q))
+        throw std::runtime_error("RSA::generate: p and q must be prime numbers");
 
     uint64_t n   = (uint64_t)p * q;
     uint64_t phi = (uint64_t)(p - 1) * (q - 1);

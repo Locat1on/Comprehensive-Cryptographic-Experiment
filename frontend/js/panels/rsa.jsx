@@ -4,15 +4,15 @@ function RSACipher({ apiShow }) {
   const [q, setQ] = useState('53');
   const [e, setE] = useState('17');
   const [msg, setMsg] = useState('Hello RSA');
+  const [ciphertext, setCiphertext] = useState('');
   const [keys, setKeys] = useState(null);
-  const [encrypted, setEncrypted] = useState(null);
   const [result, setResult] = useState('');
   const [loading, setLoading] = useState(false);
 
   async function genKeys() {
     setLoading(true);
     setResult('');
-    setEncrypted(null);
+    setCiphertext('');
     try {
       const json = await apiCall('/rsa/keygen', { p: parseInt(p), q: parseInt(q), e: parseInt(e) });
       setKeys(json);
@@ -30,8 +30,9 @@ function RSACipher({ apiShow }) {
     setResult('');
     try {
       const json = await apiCall('/rsa/encrypt', { message: msg, key: { n: keys.n, e: keys.e } });
-      setEncrypted(json.blocks);
-      setResult(`密文 (分块): ${Array.isArray(json.blocks) ? json.blocks.join(' | ') : json.blocks}`);
+      const hex = Array.isArray(json.blocks) ? json.blocks.join(' ') : json.blocks;
+      setCiphertext(hex);
+      setResult('');
     } catch (err) {
       setResult(err.message);
     } finally {
@@ -40,11 +41,14 @@ function RSACipher({ apiShow }) {
   }
 
   async function decrypt() {
-    if (!keys || !encrypted) { setResult('请先加密'); return; }
+    if (!keys) { setResult('请先生成密钥'); return; }
+    const blocks = ciphertext.trim().split(/\s+/).filter(Boolean);
+    if (blocks.length === 0) { setResult('请输入密文'); return; }
     setLoading(true);
+    setResult('');
     try {
-      const json = await apiCall('/rsa/decrypt', { blocks: encrypted, key: { n: keys.n, d: keys.d } });
-      setResult(`解密结果: ${json.message ?? JSON.stringify(json)}`);
+      const json = await apiCall('/rsa/decrypt', { blocks, key: { n: keys.n, d: keys.d } });
+      setResult(json.message ?? JSON.stringify(json));
     } catch (err) {
       setResult(err.message);
     } finally {
@@ -69,20 +73,22 @@ function RSACipher({ apiShow }) {
           {keys && (
             <div className="result-appear" style={{ background: 'rgba(1,1,32,0.04)', border: '1px solid var(--border-light)', borderRadius: 'var(--r-md)', padding: 16 }}>
               <div style={{ fontFamily: 'var(--mono)', fontSize: 12, lineHeight: 1.8 }}>
-                <div>n = <strong>{keys.n}</strong>  |  φ(n) = <strong>{keys.phi}</strong></div>
+                <div style={{ color: '#010120' }}>n = <strong>{keys.n}</strong>  |  φ(n) = <strong>{keys.phi}</strong></div>
                 <div style={{ color: '#5b57d1' }}>公钥: (e={keys.e}, n={keys.n})</div>
                 <div style={{ color: '#c54000' }}>私钥: (d={keys.d}, n={keys.n})</div>
               </div>
             </div>
           )}
           <div>
-            <MonoLabel>消息</MonoLabel>
+            <MonoLabel>明文</MonoLabel>
             <textarea className="inp" rows={3} value={msg} onChange={e => setMsg(e.target.value)} />
           </div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button className="btn btn-primary" style={{ flex: 1, justifyContent: 'center' }} onClick={encrypt} disabled={loading}>▶ 加密</button>
-            <button className="btn btn-outline" style={{ flex: 1, justifyContent: 'center' }} onClick={decrypt} disabled={loading || !encrypted}>◀ 解密</button>
+          <button className="btn btn-primary" style={{ justifyContent: 'center' }} onClick={encrypt} disabled={loading}>▶ 加密</button>
+          <div>
+            <MonoLabel>密文 (HEX)</MonoLabel>
+            <textarea className="inp mono" rows={3} value={ciphertext} onChange={e => setCiphertext(e.target.value)} placeholder="0048 0065 006C ..." />
           </div>
+          <button className="btn btn-outline" style={{ justifyContent: 'center' }} onClick={decrypt} disabled={loading}>◀ 解密</button>
           {apiShow && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
               <APIEndpoint method="POST" path="/rsa/keygen" />
